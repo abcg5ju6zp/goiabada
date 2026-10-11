@@ -83,6 +83,37 @@ func TestHandleAPIErrorJSON_ForwardsBadRequest(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, detail.HTTPStatus())
 }
 
+// TestHandleAPIErrorJSON_ForwardsTooManyRequests is #562 decision 7's AJAX half. The account pages'
+// email verification sends its code by AJAX under a budget of its own, and a 429 is the user's to
+// wait out (RFC 6585 section 4), so its code, sentence and status reach the browser, which shows the
+// sentence under the plain "Error" title, instead of "Server error" and a request id.
+func TestHandleAPIErrorJSON_ForwardsTooManyRequests(t *testing.T) {
+	testCases := []struct {
+		name string
+		err  error
+	}{
+		{"a 429", &apiclient.APIError{Code: "TOO_MANY_REQUESTS", Message: "Too many requests. Please wait and try again later.", StatusCode: http.StatusTooManyRequests}},
+		{"a wrapped 429", errs.Wrap(&apiclient.APIError{Code: "TOO_MANY_REQUESTS", Message: "Too many requests. Please wait and try again later.", StatusCode: http.StatusTooManyRequests}, "unable to send the verification email")},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			httpHelper := handlersmocks.NewHttpHelper(t)
+			captured := captureJSONError(httpHelper)
+
+			HandleAPIErrorJSON(httpHelper, httptest.NewRecorder(),
+				httptest.NewRequest(http.MethodPost, "/account/email-send-verification", nil), tc.err)
+
+			var detail *oauth.ErrorDetail
+			ok := errors.As(*captured, &detail)
+			require.True(t, ok, "expected an *oauth.ErrorDetail, got %T", *captured)
+			assert.Equal(t, "TOO_MANY_REQUESTS", detail.Code())
+			assert.Equal(t, "Too many requests. Please wait and try again later.", detail.Description())
+			assert.Equal(t, http.StatusTooManyRequests, detail.HTTPStatus())
+		})
+	}
+}
+
 // TestHandleAPIErrorJSON_GenericBranchForOtherStatuses is the other side of the boundary. A 500 from
 // the API is a server fault, so it keeps going to the log with a request id on screen rather than
 // having its English text shown to an administrator who can do nothing with it.
@@ -286,6 +317,19 @@ func TestHandleAPIErrorWithCallback_RoutesOnStatus(t *testing.T) {
 			err:          errs.Wrap(&apiclient.APIError{Code: "EMAIL_ALREADY_EXISTS", Message: "This email address is already registered", StatusCode: http.StatusConflict}, "unable to update the email"),
 			wantRendered: "This email address is already registered",
 		},
+		// Too many attempts is the user's to wait out, RFC 6585 section 4: "the user has sent too many
+		// requests in a given amount of time". The account pages' credential checks are rate-limited,
+		// and a user who mistyped their password five times was shown the 500 page (#562 decision 7).
+		{
+			name:         "a 429 re-renders the form with the API's sentence",
+			err:          &apiclient.APIError{Code: "TOO_MANY_REQUESTS", Message: "Too many requests. Please wait and try again later.", StatusCode: http.StatusTooManyRequests},
+			wantRendered: "Too many requests. Please wait and try again later.",
+		},
+		{
+			name:         "a wrapped 429 still re-renders the form",
+			err:          errs.Wrap(&apiclient.APIError{Code: "TOO_MANY_REQUESTS", Message: "Too many requests. Please wait and try again later.", StatusCode: http.StatusTooManyRequests}, "unable to change the password"),
+			wantRendered: "Too many requests. Please wait and try again later.",
+		},
 		{
 			name: "a 500 from the API stays a 500",
 			err:  &apiclient.APIError{Code: "INTERNAL_SERVER_ERROR", Message: "the database is on fire", StatusCode: http.StatusInternalServerError},
@@ -456,7 +500,7 @@ func TestHandleAPIErrorJSON_AnswersA401AsTheSessionEnded(t *testing.T) {
 func TestHandleAPIErrorJSON_NoOtherStatusCarriesTheSessionEndedCode(t *testing.T) {
 	for _, status := range []int{
 		http.StatusBadRequest, http.StatusForbidden, http.StatusNotFound, http.StatusConflict,
-		http.StatusInternalServerError, http.StatusBadGateway,
+		http.StatusTooManyRequests, http.StatusInternalServerError, http.StatusBadGateway,
 	} {
 		t.Run(http.StatusText(status), func(t *testing.T) {
 			httpHelper := handlersmocks.NewHttpHelper(t)

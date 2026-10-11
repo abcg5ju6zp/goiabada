@@ -2,13 +2,11 @@ package adminsettingshandlers
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 
-	"github.com/leodip/goiabada/adminconsole/internal/apiclient"
 	"github.com/leodip/goiabada/adminconsole/internal/render"
 	"github.com/leodip/goiabada/adminconsole/internal/reqctx"
 	"github.com/leodip/goiabada/core/api"
@@ -280,18 +278,11 @@ func HandleEmailSendTestPost(
 		// Call API to send test email (server validates SMTP enabled and email)
 		err := apiClient.SendTestEmail(r.Context(), jwtInfo.TokenResponse.AccessToken, &api.SendTestEmailRequest{To: destinationEmail})
 		if err != nil {
-			// Prefer to render form error for known API error codes
-			var apiErr *apiclient.APIError
-			if errors.As(err, &apiErr) {
-				switch apiErr.Code {
-				case "VALIDATION_ERROR", "SMTP_NOT_ENABLED", "SEND_FAILED":
-					renderError(apiErr.Message)
-				default:
-					render.HandleAPIError(httpHelper, w, r, err)
-				}
-			} else {
-				render.HandleAPIError(httpHelper, w, r, err)
-			}
+			// Every 400 of the send is about the address typed or the email settings, so the form is
+			// drawn with the API's sentence whatever the code. Naming codes sent a malformed
+			// address, which the email validator refuses under its localized error's own code, to
+			// the 500 page (#562 decision 7).
+			render.HandleAPIErrorWithCallback(httpHelper, w, r, err, renderError)
 			return
 		}
 

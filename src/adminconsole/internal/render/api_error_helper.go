@@ -87,6 +87,11 @@ func HandleAPIError(httpHelper ErrorWriter, w http.ResponseWriter, r *http.Reque
 // another account took between the form's check and its write is exactly that, and the 500 page
 // this answered before threw the form away and blamed the server (#425).
 //
+// 429 Too Many Requests joins them too. RFC 6585 section 4 defines it as "the user has sent too
+// many requests in a given amount of time": the account pages' credential checks are rate-limited,
+// and a user who mistyped their password too often can wait and resubmit. It answered the 500 page,
+// with a request id and an Error record no one had to act on (#562 decision 7).
+//
 // A 401 sends the browser to sessionEndedPath, as HandleAPIError does: no resubmission of the form
 // can succeed with a token the admin API has refused.
 func HandleAPIErrorWithCallback(httpHelper ErrorWriter, w http.ResponseWriter, r *http.Request, err error, renderErrorFunc func(string)) {
@@ -96,7 +101,7 @@ func HandleAPIErrorWithCallback(httpHelper ErrorWriter, w http.ResponseWriter, r
 	}
 	var apiErr *apiclient.APIError
 	if errors.As(err, &apiErr) {
-		if apiErr.StatusCode == http.StatusBadRequest || apiErr.StatusCode == http.StatusConflict {
+		if isUserCorrectable(apiErr.StatusCode) {
 			renderErrorFunc(apiErr.Message)
 			return
 		}
@@ -117,7 +122,9 @@ func HandleAPIErrorWithCallback(httpHelper ErrorWriter, w http.ResponseWriter, r
 // user-correctable validation failure, so its status and English description are forwarded
 // to the browser. 409 Conflict is forwarded for the same reason: it says another operation
 // won a race, which is a fact about the administrator's own request rather than a server
-// fault, and it names an action they should not repeat. Anything else, including an error
+// fault, and it names an action they should not repeat. 429 Too Many Requests is forwarded
+// as HandleAPIErrorWithCallback draws it: the user's to wait out, not a server fault, so the
+// dialog shows the API's sentence under the plain "Error" title. Anything else, including an error
 // that is not an *apiclient.APIError, falls through to JSONError's other branch: HTTP 500,
 // the detail in the server log, and a request id on screen.
 //
@@ -152,13 +159,21 @@ func HandleAPIErrorJSON(httpHelper ErrorWriter, w http.ResponseWriter, r *http.R
 			JSONNotFound(httpHelper, w, r)
 			return
 		}
-		if apiErr.StatusCode == http.StatusBadRequest || apiErr.StatusCode == http.StatusConflict {
+		if isUserCorrectable(apiErr.StatusCode) {
 			httpHelper.JSONError(w, r, oauth.NewErrorDetailWithHTTPStatus(
 				apiErr.Code, apiErr.Message, apiErr.StatusCode))
 			return
 		}
 	}
 	httpHelper.JSONError(w, r, err)
+}
+
+// isUserCorrectable reports whether an admin API status is one the person who sent the request can
+// act on and resubmit: a value the API refused (400), a change another request won (409), or too
+// many attempts in a while (429). Both HandleAPIErrorWithCallback and HandleAPIErrorJSON hand these
+// the API's sentence, so the two cannot disagree on the set.
+func isUserCorrectable(status int) bool {
+	return status == http.StatusBadRequest || status == http.StatusConflict || status == http.StatusTooManyRequests
 }
 
 // JSONNotFound is the AJAX counterpart of ErrorWriter.NotFound, and answers the same three
