@@ -79,10 +79,11 @@ func HandleAttributesEditGet(
 		}
 
 		bind := map[string]interface{}{
-			"user":      user,
-			"attribute": attribute,
-			"page":      r.URL.Query().Get("page"),
-			"query":     r.URL.Query().Get("query"),
+			"user":            user,
+			"attribute":       attribute,
+			"storedAttribute": attribute,
+			"page":            r.URL.Query().Get("page"),
+			"query":           r.URL.Query().Get("query"),
 		}
 
 		err = httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_attributes_edit.html", bind)
@@ -152,6 +153,10 @@ func HandleAttributesEditPost(
 			return
 		}
 
+		// The attribute as stored names the page in its title, and the attribute below takes the
+		// values submitted, for the inputs of a refused save drawn again (#562 decision 6).
+		storedAttribute := *attribute
+
 		// Update attribute fields with form values for potential error display
 		attribute.Key = r.FormValue("attributeKey")
 		attribute.Value = r.FormValue("attributeValue")
@@ -160,11 +165,12 @@ func HandleAttributesEditPost(
 
 		renderError := func(message string) {
 			bind := map[string]interface{}{
-				"user":      user,
-				"attribute": attribute,
-				"error":     message,
-				"page":      r.URL.Query().Get("page"),
-				"query":     r.URL.Query().Get("query"),
+				"user":            user,
+				"attribute":       attribute,
+				"storedAttribute": &storedAttribute,
+				"error":           message,
+				"page":            r.URL.Query().Get("page"),
+				"query":           r.URL.Query().Get("query"),
 			}
 
 			renderErr := httpHelper.RenderTemplate(w, r, "/layouts/menu_layout.html", "/admin_users_attributes_edit.html", bind)
