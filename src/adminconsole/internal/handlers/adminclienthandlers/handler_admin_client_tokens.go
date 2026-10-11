@@ -153,6 +153,8 @@ func HandleTokensPost(
 			IncludeOpenIDConnectClaimsInIdToken:     strings.TrimSpace(r.FormValue("includeOpenIDConnectClaimsInIdToken")),
 		}
 
+		// A refused save draws every input as submitted, a duration that is not a number and both
+		// choices included; the title comes from the stored client.
 		renderError := func(message string) {
 
 			bind := map[string]interface{}{
@@ -169,21 +171,18 @@ func HandleTokensPost(
 
 		tokenExpirationInSeconds, err := strconv.Atoi(settingsInfo.TokenExpirationInSeconds)
 		if err != nil {
-			settingsInfo.TokenExpirationInSeconds = strconv.Itoa(client.TokenExpirationInSeconds)
 			renderError("Invalid value for token expiration in seconds.")
 			return
 		}
 
 		refreshTokenOfflineIdleTimeoutInSeconds, err := strconv.Atoi(settingsInfo.RefreshTokenOfflineIdleTimeoutInSeconds)
 		if err != nil {
-			settingsInfo.RefreshTokenOfflineIdleTimeoutInSeconds = strconv.Itoa(client.RefreshTokenOfflineIdleTimeoutInSeconds)
 			renderError("Invalid value for refresh token offline - idle timeout in seconds.")
 			return
 		}
 
 		refreshTokenOfflineMaxLifetimeInSeconds, err := strconv.Atoi(settingsInfo.RefreshTokenOfflineMaxLifetimeInSeconds)
 		if err != nil {
-			settingsInfo.RefreshTokenOfflineMaxLifetimeInSeconds = strconv.Itoa(client.RefreshTokenOfflineMaxLifetimeInSeconds)
 			renderError("Invalid value for refresh token offline - max lifetime in seconds.")
 			return
 		}
