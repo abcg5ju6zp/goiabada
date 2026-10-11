@@ -243,7 +243,7 @@ func TestAccountHandlers_EveryHandlerConsultsTheApiClientWithTheRequestsContext(
 			},
 			request: handlertest.Request(http.MethodPost, "/account/otp",
 				handlertest.WithAccessToken(), handlertest.WithForm(url.Values{
-					"password": {"P4ss!word"}, "otp": {"123456"},
+					"otpAction": {"enable"}, "password": {"P4ss!word"}, "otp": {"123456"},
 				})),
 		},
 		{

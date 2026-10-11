@@ -78,10 +78,17 @@ func HandleOtpPost(
 			httpHelper.InternalServerError(w, r, reqctx.ErrNoJwtInfo)
 			return
 		}
-		// Load user to determine current OTP state
-		user, err := apiClient.GetAccountProfile(r.Context(), jwtInfo.TokenResponse.AccessToken)
-		if err != nil {
-			render.HandleAPIError(httpHelper, w, r, err)
+		// The posted form says what it does, enable or disable, and the auth server is asked for
+		// that and nothing else. The page used to read the user's stored state and ask for its
+		// inverse, whichever form had been posted, so an enrolment form left open in one tab and
+		// posted after enrolling in another switched the second factor off with nothing but the
+		// password. The auth server refuses an enable for a user who has OTP and a disable for one
+		// who has not, and either refusal reloads the page, which then draws the account as it is
+		// now; a post naming neither form changes nothing and reloads it the same way (#562
+		// decision 8).
+		otpAction := r.PostFormValue("otpAction")
+		if otpAction != "enable" && otpAction != "disable" {
+			http.Redirect(w, r, baseURL+"/account/otp", http.StatusFound)
 			return
 		}
 
@@ -120,9 +127,18 @@ func HandleOtpPost(
 		// branch of account_otp.html draws the <img> and the <pre> unconditionally, so a blank
 		// code or a wrong password would have rerendered an empty QR code and an empty seed, and
 		// the user could not have finished enrolling.
+		//
+		// The enrolment endpoint refuses a user who has OTP, and an enrolment form posted by one is
+		// a stale form refused on its own terms, a blank code or a wrong password, before the auth
+		// server looked at the state: the page reloads, as it does for the enable itself.
 		renderEnrollmentError := func(message string) {
 			enrollment, err := apiClient.GetAccountOTPEnrollment(r.Context(), jwtInfo.TokenResponse.AccessToken)
 			if err != nil {
+				var apiErr *apiclient.APIError
+				if errors.As(err, &apiErr) && apiErr.Code == "OTP_ALREADY_ENABLED" {
+					http.Redirect(w, r, baseURL+"/account/otp", http.StatusFound)
+					return
+				}
 				render.HandleAPIError(httpHelper, w, r, err)
 				return
 			}
@@ -140,23 +156,28 @@ func HandleOtpPost(
 			}
 		}
 
-		if user.OTPEnabled {
-			// disabling
+		if otpAction == "disable" {
 			req := &api.UpdateAccountOTPRequest{
 				Enabled:  false,
 				Password: password,
 			}
 			if _, err := apiClient.UpdateAccountOTP(r.Context(), jwtInfo.TokenResponse.AccessToken, req); err != nil {
 				var apiErr *apiclient.APIError
-				if errors.As(err, &apiErr) && isHandledAccountOTPError(apiErr.Code) {
-					renderDisableError(apiErr.Message)
-					return
+				if errors.As(err, &apiErr) {
+					// OTP already off, from another tab or another client: a stale disable form.
+					if apiErr.Code == "OTP_NOT_ENABLED" {
+						http.Redirect(w, r, baseURL+"/account/otp", http.StatusFound)
+						return
+					}
+					if isHandledAccountOTPError(apiErr) {
+						renderDisableError(apiErr.Message)
+						return
+					}
 				}
 				render.HandleAPIError(httpHelper, w, r, err)
 				return
 			}
 		} else {
-			// enabling
 			otpCode := r.PostFormValue("otp")
 
 			if len(otpCode) == 0 {
@@ -184,7 +205,7 @@ func HandleOtpPost(
 						http.Redirect(w, r, baseURL+"/account/otp", http.StatusFound)
 						return
 					}
-					if isHandledAccountOTPError(apiErr.Code) {
+					if isHandledAccountOTPError(apiErr) {
 						renderEnrollmentError(apiErr.Message)
 						return
 					}
@@ -198,10 +219,15 @@ func HandleOtpPost(
 	}
 }
 
-// isHandledAccountOTPError says whether a 400 or 409 from PUT /api/v1/account/otp is one this page
-// can explain to the user by redrawing the form with the API's message. Anything else is a fault
-// rather than something they did, and HandleAPIError sends it to the log and shows a generic
-// error page.
+// isHandledAccountOTPError says whether a refusal from PUT /api/v1/account/otp is one this page
+// can explain to the user by redrawing the form with the API's message: a 400 or 409 it names, or a
+// 429. Anything else is a fault rather than something they did, and HandleAPIError sends it to the
+// log and shows a generic error page.
+//
+// A 429 is the password budget the OTP check shares with the account's other credential checks,
+// spent by too many wrong passwords. RFC 6585 section 4 defines it as "the user has sent too many
+// requests in a given amount of time", which the user can wait out, so it is drawn on the form with
+// the auth server's sentence rather than as a server fault (#562 decision 7).
 //
 // CONCURRENT_UPDATE is the 409 the API answers when the account's authenticator changed under the
 // request, from another tab or client, and nothing was saved: the user acts on it by trying again,
@@ -212,8 +238,11 @@ func HandleOtpPost(
 // longer sends a secretKey, so it cannot see that refusal today, and a code missing from this list
 // reaches the user as an unexplained server error rather than as the sentence the API wrote for
 // them (#247).
-func isHandledAccountOTPError(code string) bool {
-	switch code {
+func isHandledAccountOTPError(apiErr *apiclient.APIError) bool {
+	if apiErr.StatusCode == http.StatusTooManyRequests {
+		return true
+	}
+	switch apiErr.Code {
 	case "AUTHENTICATION_FAILED",
 		"INVALID_OTP_CODE",
 		"OTP_CODE_REQUIRED",
