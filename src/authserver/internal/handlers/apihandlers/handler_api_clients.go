@@ -411,6 +411,7 @@ func HandleClientCreatePost(
 			AuthorizationCodeEnabled:                req.AuthorizationCodeEnabled,
 			ClientCredentialsEnabled:                req.ClientCredentialsEnabled,
 			IncludeOpenIDConnectClaimsInAccessToken: record.ThreeStateSettingDefault.String(),
+			IncludeOpenIDConnectClaimsInIdToken:     record.ThreeStateSettingDefault.String(),
 		}
 
 		if err := database.CreateClient(r.Context(), nil, client); err != nil {
