@@ -35,6 +35,11 @@ type Client struct {
 	IsPublic                    bool `db:"is_public"`
 	AuthorizationCodeEnabled    bool `db:"authorization_code_enabled"`
 	ClientCredentialsEnabled    bool `db:"client_credentials_enabled"`
+	// DeviceAuthorizationGrantEnabled switches the OAuth 2.0 Device Authorization Grant
+	// (RFC 8628) on for this client: the device authorization endpoint and the device_code
+	// grant at the token endpoint. Every existing client starts with it off, the migration's
+	// default, so the grant is opt-in per client.
+	DeviceAuthorizationGrantEnabled bool `db:"device_authorization_grant_enabled"`
 	// PKCERequired overrides global setting if set.
 	// nil = use global setting, true = PKCE required, false = PKCE optional
 	PKCERequired *bool `db:"pkce_required"`

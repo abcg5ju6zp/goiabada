@@ -58,6 +58,7 @@ const (
 type backgroundWorkerDatabase interface {
 	DeleteExpiredAuthorizeRequests(ctx context.Context, tx *sql.Tx, now time.Time) error
 	DeleteExpiredBrowserSessions(ctx context.Context, tx *sql.Tx, now time.Time) error
+	DeleteExpiredDeviceCodes(ctx context.Context, tx *sql.Tx, now time.Time) error
 	DeleteExpiredRateLimitCounters(ctx context.Context, tx *sql.Tx, now time.Time) error
 	DeleteExpiredRefreshTokens(ctx context.Context, tx *sql.Tx) error
 	DeleteExpiredSessions(ctx context.Context, tx *sql.Tx, maxLifetime time.Duration) error
@@ -178,8 +179,20 @@ func (w *Worker) run(ctx context.Context) {
 func (w *Worker) poll(ctx context.Context) {
 	w.reapBrowserSessions(ctx)
 	w.reapAuthorizeRequests(ctx)
+	w.reapDeviceCodes(ctx)
 	w.reapRateLimitCounters(ctx)
 	w.runIfClaimed(ctx)
+}
+
+// reapDeviceCodes deletes device authorizations past expires_at. It runs on every poll, outside
+// the claim, like the parked-authorize-request reap: POST /auth/device is unauthenticated and
+// issues a row each call, so without the frequent sweep a sustained caller would pile rows up to
+// the twelve-hour claim. The predicate is expiry alone, so an authorization still within its
+// lifetime is never deleted whether it is pending, approved or consumed.
+func (w *Worker) reapDeviceCodes(ctx context.Context) {
+	if err := w.database.DeleteExpiredDeviceCodes(ctx, nil, time.Now().UTC()); err != nil {
+		slog.ErrorContext(ctx, "unable to delete expired device codes", "error", err)
+	}
 }
 
 // reapRateLimitCounters deletes the shared credential counters whose two windows have both passed.

@@ -5533,6 +5533,9 @@ components:
           type: boolean
         clientCredentialsEnabled:
           type: boolean
+        deviceAuthorizationGrantEnabled:
+          type: boolean
+          description: "When true, the client may use the OAuth 2.0 device authorization grant (RFC 8628): POST /auth/device and grant_type=urn:ietf:params:oauth:grant-type:device_code"
         pkceRequired:
           type: boolean
           nullable: true
@@ -5589,6 +5592,7 @@ components:
         - isSystemLevelClient
         - authorizationCodeEnabled
         - clientCredentialsEnabled
+        - deviceAuthorizationGrantEnabled
         - pkceRequired
         - implicitGrantEnabled
         - resourceOwnerPasswordCredentialsEnabled
@@ -5711,6 +5715,9 @@ components:
           type: boolean
         clientCredentialsEnabled:
           type: boolean
+        deviceAuthorizationGrantEnabled:
+          type: boolean
+          description: When true, the client may use the OAuth 2.0 device authorization grant (RFC 8628)
         pkceRequired:
           type: boolean
           nullable: true

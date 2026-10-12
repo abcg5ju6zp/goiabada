@@ -29,6 +29,8 @@ type RefreshTokenGrantInput struct {
 	RefreshToken   *record.RefreshToken
 	ScopeRequested string
 	IsROPC         bool
+	// IsDevice names the device authorization grant's code-less token, beside IsROPC.
+	IsDevice bool
 }
 
 // RefreshOutcome is what a successful refresh did besides answering, for the token handler's audit.
@@ -128,15 +130,21 @@ func (t *TokenIssuer) IssueRefreshTokenGrant(ctx context.Context, settings *reco
 	// It sits ABOVE MarkRefreshTokenAsRevoked on purpose too, so a token this refuses is not spent:
 	// the operator may turn the switch back on, and a live token should still be live when they do.
 	//
-	// The ROPC arm resolves the global setting rather than reading only the per-client override,
-	// because the password grant does. Otherwise turning the global switch off would block new
-	// logins while inheriting clients kept refreshing indefinitely, which is not what the switch
-	// says it does.
-	if input.IsROPC {
+	// Each code-less arm resolves its own grant's switch: the ROPC arm the password grant's
+	// global-or-client setting, because the password grant does, and the device arm the client's
+	// device authorization switch alone. The origins are recorded on the row (grant_origin), so
+	// disabling ROPC cannot leave an ROPC family refreshing behind a device-only client's switch,
+	// and turning the device grant off stops a device family the ROPC switch cannot reach.
+	switch {
+	case input.IsROPC:
 		if !input.Client.IsResourceOwnerPasswordCredentialsEnabled(settings.ResourceOwnerPasswordCredentialsEnabled) {
 			return nil, nil, ErrRefreshFlowDisabled
 		}
-	} else if !input.Client.AuthorizationCodeEnabled {
+	case input.IsDevice:
+		if !input.Client.DeviceAuthorizationGrantEnabled {
+			return nil, nil, ErrRefreshFlowDisabled
+		}
+	case !input.Client.AuthorizationCodeEnabled:
 		return nil, nil, ErrRefreshFlowDisabled
 	}
 
@@ -234,7 +242,9 @@ func (t *TokenIssuer) IssueRefreshTokenGrant(ctx context.Context, settings *reco
 		parent := *refreshToken
 		parent.AuthStateGeneration = current.AuthStateGeneration
 
-		if input.IsROPC {
+		if input.IsROPC || input.IsDevice {
+			// Both code-less origins mint from the user and client on the token row in the same
+			// shape the password grant established; the device origin is carried on the child.
 			tokenResponse, err = t.mintROPCRefreshTokens(ctx, tx, settings, &parent, input.ScopeRequested)
 		} else {
 			tokenResponse, err = t.mintCodeRefreshTokens(ctx, tx, settings, &parent.Code, &parent, input.ScopeRequested)
@@ -245,8 +255,9 @@ func (t *TokenIssuer) IssueRefreshTokenGrant(ctx context.Context, settings *reco
 		return nil, nil, err
 	}
 
-	if input.IsROPC {
-		// A password grant's token has no browser session to bump.
+	if input.IsROPC || input.IsDevice {
+		// A code-less grant's token has no browser session to bump: the password grant never had
+		// one, and the device grant's refresh tokens are offline rows.
 		return tokenResponse, &RefreshOutcome{}, nil
 	}
 
@@ -266,10 +277,10 @@ func (t *TokenIssuer) IssueRefreshTokenGrant(ctx context.Context, settings *reco
 }
 
 // refreshOwnerUserId is the user a presented refresh token belongs to: the token's own for a
-// password grant's, which records none through a code, and the code's otherwise. The rotation takes
-// this user's row first (#131).
+// code-less grant's (the password and device grants), which records none through a code, and the
+// code's otherwise. The rotation takes this user's row first (#131).
 func refreshOwnerUserId(input *RefreshTokenGrantInput) int64 {
-	if input.IsROPC {
+	if input.IsROPC || input.IsDevice {
 		return input.RefreshToken.UserId.Int64
 	}
 	return input.RefreshToken.Code.UserId
@@ -482,7 +493,8 @@ func (t *TokenIssuer) mintROPCRefreshTokens(ctx context.Context, tx *sql.Tx, set
 
 	// RFC 6749 Section 6: New refresh token scope MUST be identical to the original refresh token's scope
 	originalRefreshTokenScope := parent.Scope
-	refreshToken, refreshExpiresIn, err := t.generateRefreshTokenForROPC(ctx, tx, settings, ropcInput, originalRefreshTokenScope, now, privKey, keyIdentifier, parent)
+	childOrigin := oidc.GrantOrigin(parent.GrantOrigin)
+	refreshToken, refreshExpiresIn, err := t.generateRefreshTokenForCodelessGrant(ctx, tx, settings, ropcInput, originalRefreshTokenScope, now, privKey, keyIdentifier, parent, childOrigin)
 	if err != nil {
 		return nil, err
 	}

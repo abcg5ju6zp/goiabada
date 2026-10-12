@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
@@ -82,6 +83,8 @@ type consentDatabase interface {
 
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
+	ApproveDeviceCode(ctx context.Context, tx *sql.Tx, deviceCodeId int64, input *record.DeviceCodeApproval, now time.Time) (bool, error)
+	DenyDeviceCode(ctx context.Context, tx *sql.Tx, deviceCodeId int64, now time.Time) (bool, error)
 }
 
 func HandleConsentGet(
@@ -274,8 +277,33 @@ func HandleConsentPost(
 			answer, need = decideConsentSubmission(facts)
 		}
 
+		// A device ceremony never redirects to a client: its consent binds the device_codes row
+		// and the browser ends on the device completed page.
+		isDeviceCeremony := authContext.DeviceCodeId != 0
+
 		switch answer {
-		case consentSubmissionDeclined, consentSubmissionNothingTicked:
+		case consentSubmissionDeclined, consentSubmissionNothingTicked, consentSubmissionNothingHeld:
+			if isDeviceCeremony {
+				denyDeviceConsent(w, r, pageRenderer, ceremonyStore, database, auditLogger,
+					authContext, client, baseURL)
+				return
+			}
+
+			if answer == consentSubmissionNothingHeld {
+				slog.WarnContext(r.Context(), "the consented selection holds no permission the user still has, so no consent is recorded",
+					"user_id", user.Id,
+					"client_identifier", authContext.ClientId)
+
+				// A DIFFERENT refusal from the decline one, deliberately. It answers a selection an
+				// administrator emptied, which is not the user's choice; the wording and the error
+				// code are /auth/completed's for the same condition arriving later, so the same
+				// removal gets one answer wherever it lands (#241 decision 3).
+				answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
+					redirectErrorFromAuthContext(authContext, client,
+						"access_denied", "The user is not authorized to access any of the requested scopes"))
+				return
+			}
+
 			// A refusal answers the client with an error redirect, and an error redirect carries
 			// the client it is answering, so provenance is resolved here, where no client has
 			// been loaded; no request reaches both this and the load above (#108).
@@ -288,19 +316,6 @@ func HandleConsentPost(
 			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
 				redirectErrorFromAuthContext(authContext, refusedClient,
 					"access_denied", "The user did not provide consent"))
-		case consentSubmissionNothingHeld:
-			slog.WarnContext(r.Context(), "the consented selection holds no permission the user still has, so no consent is recorded",
-				"user_id", user.Id,
-				"client_identifier", authContext.ClientId)
-
-			// A DIFFERENT refusal from the one above, deliberately. That one answers a user who
-			// declined or ticked nothing, which is a choice they made; this one answers a
-			// selection an administrator emptied, which is not. The wording and the error code
-			// are /auth/completed's for the same condition arriving later, so the same removal
-			// gets one answer wherever it lands (#241 decision 3).
-			answerClientWithError(w, r, database, pageRenderer, ceremonyStore, templateFS,
-				redirectErrorFromAuthContext(authContext, client,
-					"access_denied", "The user is not authorized to access any of the requested scopes"))
 		default:
 			consent, err := userconsent.Record(r.Context(), database, user.Id, client.Id, *facts.heldScope)
 			if err != nil {
@@ -314,6 +329,12 @@ func HandleConsentPost(
 				"client_id":  consent.ClientId,
 				"consent_id": consent.Id,
 			})
+
+			if isDeviceCeremony {
+				approveDeviceConsent(w, r, pageRenderer, ceremonyStore, database, auditLogger,
+					authContext, user, client, consent.Scope, baseURL)
+				return
+			}
 
 			// consent is done, ready to issue code
 			authContext.AuthState = ceremony.AuthStateReadyToIssueCode

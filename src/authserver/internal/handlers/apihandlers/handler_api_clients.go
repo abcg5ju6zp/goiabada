@@ -939,6 +939,7 @@ func HandleClientOAuth2FlowsPut(
 		// Apply changes with current business rules
 		client.AuthorizationCodeEnabled = req.AuthorizationCodeEnabled
 		client.ClientCredentialsEnabled = req.ClientCredentialsEnabled
+		client.DeviceAuthorizationGrantEnabled = req.DeviceAuthorizationGrantEnabled
 		client.PKCERequired = req.PKCERequired
 		client.ImplicitGrantEnabled = req.ImplicitGrantEnabled
 		client.ResourceOwnerPasswordCredentialsEnabled = req.ResourceOwnerPasswordCredentialsEnabled

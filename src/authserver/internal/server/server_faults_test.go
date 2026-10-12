@@ -36,6 +36,7 @@ var protocolRoutes = []string{
 	"GET /.well-known/openid-configuration",
 	"HEAD /.well-known/openid-configuration",
 	"POST /connect/register",
+	"POST /auth/device",
 }
 
 // routeFormat is the format a registered route must answer a fault in: the protocol routes above,

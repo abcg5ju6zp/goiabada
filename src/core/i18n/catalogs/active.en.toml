@@ -95,6 +95,23 @@
 "consent.scope.permission_template" = "Permission {{.permission}} on resource {{.resource}}"
 "consent.scope.authserver_manage_account.description" = "Manage your account for you: change your profile, phone, address and picture, see and sign out your sessions, and withdraw consents you have given. Changing your email, password or two-factor authentication still needs your password."
 
+# --- Device authorization grant (RFC 8628, /device) --------------------------
+
+"device.user_code.page_title" = "Enter device code"
+"device.user_code.title" = "Connect a device"
+"device.user_code.instructions" = "Enter the code shown on the device you want to sign in with. You can type it with or without the dash."
+"device.user_code.field" = "Device code"
+"device.user_code.placeholder" = "XXXX-XXXX"
+"device.user_code.error.invalid" = "That code is not valid or has expired. Check the code on your device and try again."
+"device.user_code.button" = "Continue"
+"device.completed.page_title" = "Device sign-in"
+"device.completed.approved.title" = "Device connected"
+"device.completed.approved.message" = "You can return to your device. It is signing you in now."
+"device.completed.denied.title" = "Sign-in cancelled"
+"device.completed.denied.message" = "You did not authorize the device. You can close this page."
+"device.completed.expired.title" = "Code expired"
+"device.completed.expired.message" = "The code expired or was used elsewhere. Start the sign-in again on your device."
+
 # --- Logout confirmation (auth/logout) --------------------------------------
 
 "logout_consent.page_title" = "Sign-out consent"
@@ -828,6 +845,8 @@
 "adminconsole.admin_clients.oauth2_flows.client_creds_public_warning_prefix" = "Your client authentication must be configured as "
 "adminconsole.admin_clients.oauth2_flows.client_creds_public_warning_em" = "confidential"
 "adminconsole.admin_clients.oauth2_flows.client_creds_public_warning_suffix" = " for you to activate the client credentials flow."
+"adminconsole.admin_clients.oauth2_flows.device_label" = "Device authorization grant"
+"adminconsole.admin_clients.oauth2_flows.device_tooltip" = "RFC 8628 - The OAuth 2.0 device authorization grant lets devices with limited input capabilities, such as smart TVs or command-line tools, obtain user authorization: the device shows a code, the user opens the verification URL on another device, signs in and confirms, and the device polls the token endpoint for its tokens."
 "adminconsole.admin_clients.oauth2_flows.implicit_label" = "Implicit flow"
 "adminconsole.admin_clients.oauth2_flows.implicit_tooltip" = "RFC 6749 Section 4.2 - The implicit flow returns tokens directly from the authorization endpoint. This flow is deprecated in OAuth 2.1 due to security concerns."
 "adminconsole.admin_clients.oauth2_flows.implicit_warning" = "Warning: The implicit flow is deprecated in OAuth 2.1 and has known security vulnerabilities. Tokens are exposed in URLs and browser history, and no refresh tokens can be issued. Use the authorization code flow with PKCE instead whenever possible."

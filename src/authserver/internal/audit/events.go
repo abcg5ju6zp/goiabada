@@ -45,6 +45,13 @@ const (
 	// RFC 6749 Section 4.3
 	// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
 	EventTokenIssuedROPCResponse = "token_issued_ropc_response" //nolint:gosec // G101: an audit event name, not a credential
+	// EventTokenIssuedDeviceCodeResponse is logged when tokens are issued via the OAuth 2.0
+	// Device Authorization Grant (RFC 8628), after the user approved at the verification page.
+	EventTokenIssuedDeviceCodeResponse = "token_issued_device_code_response"
+	// EventDeviceAuthorizationApproved and EventDeviceAuthorizationDenied record the browser
+	// confirmation that moves a device authorization out of pending.
+	EventDeviceAuthorizationApproved = "device_authorization_approved"
+	EventDeviceAuthorizationDenied   = "device_authorization_denied"
 	// EventTokenScopeDenied is logged when a token request fails scope validation, on any grant
 	// type. Emitted from a single call site in HandleTokenPost, after ValidateTokenRequest has
 	// failed with an invalid_scope error, so every row follows a successful authentication of
@@ -506,6 +513,8 @@ var auditEventTypes = []string{
 	EventDeletedUserProfilePicture,
 	EventDeletedUserSession,
 	EventDeletedUserSessionClient,
+	EventDeviceAuthorizationApproved,
+	EventDeviceAuthorizationDenied,
 	EventDisabledOTP,
 	EventDynamicClientRegistration,
 	EventEnabledOTP,
@@ -535,6 +544,7 @@ var auditEventTypes = []string{
 	EventTerminatedUserSession,
 	EventTokenIssuedAuthorizationCodeResponse,
 	EventTokenIssuedClientCredentialsResponse,
+	EventTokenIssuedDeviceCodeResponse,
 	EventTokenIssuedImplicitResponse,
 	EventTokenIssuedRefreshTokenResponse,
 	EventTokenIssuedROPCResponse,

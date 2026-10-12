@@ -138,7 +138,7 @@ func TestDiscovery_ImplementedCapabilities(t *testing.T) {
 	fieldAs("token_endpoint_auth_methods_supported", &authMethods)
 	fieldAs("claims_supported", &claims)
 
-	assert.Equal(t, []string{"authorization_code", "refresh_token", "client_credentials", "password", "implicit"}, grantTypes)
+	assert.Equal(t, []string{"authorization_code", "refresh_token", "client_credentials", "password", "implicit", "urn:ietf:params:oauth:grant-type:device_code"}, grantTypes)
 	assert.Equal(t, []string{"code", "token", "id_token", "id_token token"}, responseTypes)
 	assert.Equal(t, []string{"query", "fragment", "form_post"}, responseModes)
 	assert.Equal(t, []string{"client_secret_post", "client_secret_basic", "none"}, authMethods)

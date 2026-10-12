@@ -207,8 +207,13 @@ func HandleAuthCompletedGet(
 		}
 
 		facts := afterBindingFacts{
-			promptConsent:    authContext.HasPromptValue("consent"),
-			consentRequired:  client.ConsentRequired,
+			promptConsent: authContext.HasPromptValue("consent"),
+			// A device ceremony always takes the consent page, even when the client does not
+			// ordinarily require one: RFC 8628's user confirmation is the device owner explicitly
+			// approving that device, and the page is where the approval binds the browser session
+			// and the user's choice to the device code. Skipping it would send a device ceremony
+			// to /auth/issue, which only knows how to issue an authorization code.
+			consentRequired:  client.ConsentRequired || authContext.DeviceCodeId != 0,
 			clientIdentifier: client.ClientIdentifier,
 		}
 		answer, need := decideAfterBinding(facts)

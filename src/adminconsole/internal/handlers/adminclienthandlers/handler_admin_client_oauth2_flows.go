@@ -70,6 +70,7 @@ func HandleOAuth2FlowsGet(
 			IsPublic                                      bool
 			AuthorizationCodeEnabled                      bool
 			ClientCredentialsEnabled                      bool
+			DeviceAuthorizationGrantEnabled               bool
 			IsSystemLevelClient                           bool
 			PKCERequired                                  *bool
 			GlobalPKCERequired                            bool
@@ -83,6 +84,7 @@ func HandleOAuth2FlowsGet(
 			IsPublic:                                client.IsPublic,
 			AuthorizationCodeEnabled:                client.AuthorizationCodeEnabled,
 			ClientCredentialsEnabled:                client.ClientCredentialsEnabled,
+			DeviceAuthorizationGrantEnabled:         client.DeviceAuthorizationGrantEnabled,
 			IsSystemLevelClient:                     client.IsSystemLevelClient,
 			PKCERequired:                            client.PKCERequired,
 			GlobalPKCERequired:                      settingsResp.PKCERequired,
@@ -159,6 +161,7 @@ func HandleOAuth2FlowsPost(
 
 		authCodeEnabled := r.FormValue("authCodeEnabled") == "on"
 		clientCredentialsEnabled := r.FormValue("clientCredentialsEnabled") == "on"
+		deviceAuthorizationGrantEnabled := r.FormValue("deviceAuthorizationGrantEnabled") == "on"
 
 		// Handle tri-state PKCE: "global" = nil (use global), "on" = true (required), "off" = false (optional)
 		pkceRequiredValue := r.FormValue("pkceRequired")
@@ -217,6 +220,7 @@ func HandleOAuth2FlowsPost(
 		req := &api.UpdateClientOAuth2FlowsRequest{
 			AuthorizationCodeEnabled:                client.AuthorizationCodeEnabled,
 			ClientCredentialsEnabled:                client.ClientCredentialsEnabled,
+			DeviceAuthorizationGrantEnabled:         deviceAuthorizationGrantEnabled,
 			PKCERequired:                            pkceRequired,
 			ImplicitGrantEnabled:                    implicitGrantEnabled,
 			ResourceOwnerPasswordCredentialsEnabled: ropcEnabled,

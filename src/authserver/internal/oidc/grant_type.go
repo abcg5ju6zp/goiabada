@@ -12,10 +12,28 @@ const (
 	GrantTypeClientCredentials GrantType = "client_credentials"
 	GrantTypePassword          GrantType = "password"
 	GrantTypeImplicit          GrantType = "implicit"
+	// GrantTypeDeviceCode is the OAuth 2.0 Device Authorization Grant, RFC 8628 section 3.4:
+	// the device exchanges a device_code it obtained from the device authorization endpoint.
+	GrantTypeDeviceCode GrantType = "urn:ietf:params:oauth:grant-type:device_code"
 )
 
 func (gt GrantType) String() string {
 	return string(gt)
+}
+
+// GrantOrigin is recorded on each refresh token row as the grant that issued its family. The
+// refresh redemption gates on the issuing grant's own client switch, so it cannot infer the
+// origin from code_id: the ROPC grant and the device_code grant both issue code-less tokens.
+type GrantOrigin string
+
+const (
+	GrantOriginAuthorizationCode GrantOrigin = "authorization_code"
+	GrantOriginROPC              GrantOrigin = "ropc"
+	GrantOriginDeviceCode        GrantOrigin = "device_code"
+)
+
+func (o GrantOrigin) String() string {
+	return string(o)
 }
 
 // grantTraits is what the server does with one grant type.
@@ -50,6 +68,10 @@ var grantTable = []grantTraits{
 	{GrantTypeClientCredentials, true, true, true},
 	{GrantTypePassword, true, true, false},
 	{GrantTypeImplicit, false, false, false},
+	// RFC 8628: redeemed at the token endpoint. It never reads the request's scope parameter
+	// (section 3.4 names grant_type and device_code alone; the granted scope is the one the
+	// device authorization request asked and the user approved), and DCR does not offer it.
+	{GrantTypeDeviceCode, true, false, false},
 }
 
 func (gt GrantType) traits() (grantTraits, bool) {

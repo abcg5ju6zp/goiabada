@@ -464,6 +464,7 @@ func ToClientResponse(client *record.Client) *api.ClientResponse {
 		IsSystemLevelClient:                     client.IsSystemLevelClient(),
 		AuthorizationCodeEnabled:                client.AuthorizationCodeEnabled,
 		ClientCredentialsEnabled:                client.ClientCredentialsEnabled,
+		DeviceAuthorizationGrantEnabled:         client.DeviceAuthorizationGrantEnabled,
 		PKCERequired:                            client.PKCERequired,
 		ImplicitGrantEnabled:                    client.ImplicitGrantEnabled,
 		ResourceOwnerPasswordCredentialsEnabled: client.ResourceOwnerPasswordCredentialsEnabled,

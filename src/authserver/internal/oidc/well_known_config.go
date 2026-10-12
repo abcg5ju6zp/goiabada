@@ -8,6 +8,9 @@ type WellKnownConfig struct {
 	EndSessionEndpoint                string   `json:"end_session_endpoint"`
 	JWKsURI                           string   `json:"jwks_uri"`
 	RegistrationEndpoint              string   `json:"registration_endpoint,omitempty"` // RFC 7591 §4
+	// DeviceAuthorizationEndpoint is the RFC 8628 section 3.1 device authorization endpoint,
+	// published while the server implements the device_code grant, which the grant list says.
+	DeviceAuthorizationEndpoint       string   `json:"device_authorization_endpoint,omitempty"`
 	GrantTypesSupported               []string `json:"grant_types_supported"`
 	ResponseTypesSupported            []string `json:"response_types_supported"`
 	ResponseModesSupported            []string `json:"response_modes_supported,omitempty"` // OIDC Discovery 1.0 §3

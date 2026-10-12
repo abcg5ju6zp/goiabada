@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"net/http"
+	"time"
 
 	"github.com/leodip/goiabada/core/errs"
 
@@ -31,8 +32,13 @@ type tokenValidatorDatabase interface {
 	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	CodeLoadClient(ctx context.Context, tx *sql.Tx, code *record.Code) error
 	CodeLoadUser(ctx context.Context, tx *sql.Tx, code *record.Code) error
+	MarkDeviceCodeConsumed(ctx context.Context, tx *sql.Tx, deviceCodeId int64, status string) (bool, error)
+	RecordDeviceCodePoll(ctx context.Context, tx *sql.Tx, deviceCodeId int64, polledAt time.Time, intervalSeconds int) error
+	DeviceCodeLoadClient(ctx context.Context, tx *sql.Tx, deviceCode *record.DeviceCode) error
+	DeviceCodeLoadUser(ctx context.Context, tx *sql.Tx, deviceCode *record.DeviceCode) error
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
 	GetCodeByCodeHash(ctx context.Context, tx *sql.Tx, codeHash string, used bool) (*record.Code, error)
+	GetDeviceCodeByDeviceCodeHash(ctx context.Context, tx *sql.Tx, deviceCodeHash string) (*record.DeviceCode, error)
 	GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error)
 	GetRefreshTokenByJti(ctx context.Context, tx *sql.Tx, jti string) (*record.RefreshToken, error)
 	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.User, error)
@@ -76,6 +82,8 @@ type ValidateTokenRequestInput struct {
 	// Username and Password are used for ROPC grant (RFC 6749 Section 4.3)
 	Username string
 	Password string
+	// DeviceCode is used for the device_code grant (RFC 8628 section 3.4).
+	DeviceCode string
 }
 
 // TokenGrant is what a validated token request is: one type per grant, declared beside the method
@@ -127,6 +135,8 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *r
 		return asTokenGrant(val.validateRefreshTokenGrant(ctx, settings, client, input))
 	case oidc.GrantTypePassword:
 		return asTokenGrant(val.validatePasswordGrant(ctx, settings, client, input))
+	case oidc.GrantTypeDeviceCode:
+		return asTokenGrant(val.validateDeviceCodeGrant(ctx, client, input))
 	default:
 		// Reachable only if the grant table accepts a grant this switch has no arm for; the
 		// validator's tests hold the two in agreement.

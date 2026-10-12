@@ -60,6 +60,9 @@ type ClientResponse struct {
 	IsSystemLevelClient         bool  `json:"isSystemLevelClient"`
 	AuthorizationCodeEnabled    bool  `json:"authorizationCodeEnabled"`
 	ClientCredentialsEnabled    bool  `json:"clientCredentialsEnabled"`
+	// DeviceAuthorizationGrantEnabled switches the OAuth 2.0 Device Authorization Grant
+	// (RFC 8628) for the client: the /auth/device endpoint and the device_code token grant.
+	DeviceAuthorizationGrantEnabled bool  `json:"deviceAuthorizationGrantEnabled"`
 	PKCERequired                *bool `json:"pkceRequired"`
 	// ImplicitGrantEnabled: nil = use global setting, true = enabled, false = disabled
 	// SECURITY NOTE: Implicit flow is deprecated in OAuth 2.1
@@ -133,6 +136,9 @@ type UpdateClientAuthenticationRequest struct {
 type UpdateClientOAuth2FlowsRequest struct {
 	AuthorizationCodeEnabled bool `json:"authorizationCodeEnabled"`
 	ClientCredentialsEnabled bool `json:"clientCredentialsEnabled"`
+	// DeviceAuthorizationGrantEnabled enables the OAuth 2.0 Device Authorization Grant
+	// (RFC 8628) for the client.
+	DeviceAuthorizationGrantEnabled bool `json:"deviceAuthorizationGrantEnabled"`
 	// PKCERequired: nil = use global setting, true = required, false = optional
 	PKCERequired *bool `json:"pkceRequired"`
 	// ImplicitGrantEnabled: nil = use global setting, true = enabled, false = disabled

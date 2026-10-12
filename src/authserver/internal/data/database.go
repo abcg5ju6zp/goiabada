@@ -579,6 +579,29 @@ type Database interface {
 	// DeleteExpiredAuthorizeRequests reaps on expires_at alone.
 	DeleteExpiredAuthorizeRequests(ctx context.Context, tx *sql.Tx, now time.Time) error
 
+	// A device authorization is one RFC 8628 device_code grant from issue to its one consumption.
+	CreateDeviceCode(ctx context.Context, tx *sql.Tx, deviceCode *record.DeviceCode) error
+	GetDeviceCodeById(ctx context.Context, tx *sql.Tx, deviceCodeId int64) (*record.DeviceCode, error)
+	// GetDeviceCodeByDeviceCodeHash returns the row whatever its state, or nil; the caller
+	// distinguishes an expired row from an unknown code.
+	GetDeviceCodeByDeviceCodeHash(ctx context.Context, tx *sql.Tx, deviceCodeHash string) (*record.DeviceCode, error)
+	// GetPendingDeviceCodeByUserCodeHash returns only a live, still-pending code; expiry and
+	// state are active predicates in the statement.
+	GetPendingDeviceCodeByUserCodeHash(ctx context.Context, tx *sql.Tx, userCodeHash string, now time.Time) (*record.DeviceCode, error)
+	// ApproveDeviceCode and DenyDeviceCode are the one-winner pending -> terminal
+	// compare-and-sets, refusing a second confirmation, a racing opposite answer or expiry.
+	ApproveDeviceCode(ctx context.Context, tx *sql.Tx, deviceCodeId int64, input *record.DeviceCodeApproval, now time.Time) (bool, error)
+	DenyDeviceCode(ctx context.Context, tx *sql.Tx, deviceCodeId int64, now time.Time) (bool, error)
+	// MarkDeviceCodeConsumed claims the one terminal delivery the grant allows: the approved
+	// poll that mints tokens, or the denied poll that is told access_denied.
+	MarkDeviceCodeConsumed(ctx context.Context, tx *sql.Tx, deviceCodeId int64, status string) (bool, error)
+	// RecordDeviceCodePoll moves a pending row's last poll time and demanded interval.
+	RecordDeviceCodePoll(ctx context.Context, tx *sql.Tx, deviceCodeId int64, polledAt time.Time, intervalSeconds int) error
+	DeviceCodeLoadClient(ctx context.Context, tx *sql.Tx, deviceCode *record.DeviceCode) error
+	DeviceCodeLoadUser(ctx context.Context, tx *sql.Tx, deviceCode *record.DeviceCode) error
+	// DeleteExpiredDeviceCodes reaps on expires_at alone; it never removes a live authorization.
+	DeleteExpiredDeviceCodes(ctx context.Context, tx *sql.Tx, now time.Time) error
+
 	// A rate-limit counter is one shared tier's count for one key digest in one window, which is
 	// what lets every replica spend the same credential-guessing budget (#394).
 	//

@@ -43,8 +43,14 @@ func TestMigration000051_RefreshTokenAuthenticatedAt(t *testing.T) {
 
 	require.NoError(t, h.Migrator.Migrate(ctx, 51), "apply 000051")
 
-	// 2 and 3.
+	// 2.
 	assertAuthenticatedAtShape000051(t, h, "after apply")
+
+	// 3 reads through the repository, whose SELECT carries the head schema (000063 adds
+	// grant_origin), so bring the isolated database to head before the read. The column under
+	// test is untouched by the later migrations, so the NULL it reads is still the one 000051
+	// left behind.
+	require.NoError(t, h.Migrator.Up(ctx), "migrate to head before reading through the repository")
 	assertSeededTokenHasNoInstant000051(t, h, jti, "after apply")
 
 	// 4.
@@ -54,6 +60,7 @@ func TestMigration000051_RefreshTokenAuthenticatedAt(t *testing.T) {
 
 	require.NoError(t, h.Migrator.Migrate(ctx, 51), "re-apply 000051")
 	assertAuthenticatedAtShape000051(t, h, "after down/up round trip")
+	require.NoError(t, h.Migrator.Up(ctx), "migrate to head before reading through the repository")
 	assertSeededTokenHasNoInstant000051(t, h, jti, "after down/up round trip")
 }
 

@@ -17320,3 +17320,119 @@ func (_c *Database_WebOriginExists_Call) RunAndReturn(run func(ctx context.Conte
 	_c.Call.Return(run)
 	return _c
 }
+
+// The device_code grant methods below were appended by the device authorization grant change
+// in the same generated style (mockery v3 could not be re-run locally because its package loader
+// predates the toolchain's export data version). Only the methods are present; tests use the
+// mock.On(...).Return(...) form, as the rest of this file's consumers do.
+
+// CreateDeviceCode provides a mock function for the type Database
+func (_mock *Database) CreateDeviceCode(ctx context.Context, tx *sql.Tx, deviceCode *record.DeviceCode) error {
+	ret := _mock.Called(ctx, tx, deviceCode)
+	if len(ret) == 0 {
+		panic("no return value specified for CreateDeviceCode")
+	}
+	return ret.Error(0)
+}
+
+// GetDeviceCodeById provides a mock function for the type Database
+func (_mock *Database) GetDeviceCodeById(ctx context.Context, tx *sql.Tx, deviceCodeId int64) (*record.DeviceCode, error) {
+	ret := _mock.Called(ctx, tx, deviceCodeId)
+	if len(ret) == 0 {
+		panic("no return value specified for GetDeviceCodeById")
+	}
+	var r0 *record.DeviceCode
+	if ret.Get(0) != nil {
+		r0 = ret.Get(0).(*record.DeviceCode)
+	}
+	return r0, ret.Error(1)
+}
+
+// GetDeviceCodeByDeviceCodeHash provides a mock function for the type Database
+func (_mock *Database) GetDeviceCodeByDeviceCodeHash(ctx context.Context, tx *sql.Tx, deviceCodeHash string) (*record.DeviceCode, error) {
+	ret := _mock.Called(ctx, tx, deviceCodeHash)
+	if len(ret) == 0 {
+		panic("no return value specified for GetDeviceCodeByDeviceCodeHash")
+	}
+	var r0 *record.DeviceCode
+	if ret.Get(0) != nil {
+		r0 = ret.Get(0).(*record.DeviceCode)
+	}
+	return r0, ret.Error(1)
+}
+
+// GetPendingDeviceCodeByUserCodeHash provides a mock function for the type Database
+func (_mock *Database) GetPendingDeviceCodeByUserCodeHash(ctx context.Context, tx *sql.Tx, userCodeHash string, now time.Time) (*record.DeviceCode, error) {
+	ret := _mock.Called(ctx, tx, userCodeHash, now)
+	if len(ret) == 0 {
+		panic("no return value specified for GetPendingDeviceCodeByUserCodeHash")
+	}
+	var r0 *record.DeviceCode
+	if ret.Get(0) != nil {
+		r0 = ret.Get(0).(*record.DeviceCode)
+	}
+	return r0, ret.Error(1)
+}
+
+// ApproveDeviceCode provides a mock function for the type Database
+func (_mock *Database) ApproveDeviceCode(ctx context.Context, tx *sql.Tx, deviceCodeId int64, input *record.DeviceCodeApproval, now time.Time) (bool, error) {
+	ret := _mock.Called(ctx, tx, deviceCodeId, input, now)
+	if len(ret) == 0 {
+		panic("no return value specified for ApproveDeviceCode")
+	}
+	return ret.Get(0).(bool), ret.Error(1)
+}
+
+// DenyDeviceCode provides a mock function for the type Database
+func (_mock *Database) DenyDeviceCode(ctx context.Context, tx *sql.Tx, deviceCodeId int64, now time.Time) (bool, error) {
+	ret := _mock.Called(ctx, tx, deviceCodeId, now)
+	if len(ret) == 0 {
+		panic("no return value specified for DenyDeviceCode")
+	}
+	return ret.Get(0).(bool), ret.Error(1)
+}
+
+// MarkDeviceCodeConsumed provides a mock function for the type Database
+func (_mock *Database) MarkDeviceCodeConsumed(ctx context.Context, tx *sql.Tx, deviceCodeId int64, status string) (bool, error) {
+	ret := _mock.Called(ctx, tx, deviceCodeId, status)
+	if len(ret) == 0 {
+		panic("no return value specified for MarkDeviceCodeConsumed")
+	}
+	return ret.Get(0).(bool), ret.Error(1)
+}
+
+// RecordDeviceCodePoll provides a mock function for the type Database
+func (_mock *Database) RecordDeviceCodePoll(ctx context.Context, tx *sql.Tx, deviceCodeId int64, polledAt time.Time, intervalSeconds int) error {
+	ret := _mock.Called(ctx, tx, deviceCodeId, polledAt, intervalSeconds)
+	if len(ret) == 0 {
+		panic("no return value specified for RecordDeviceCodePoll")
+	}
+	return ret.Error(0)
+}
+
+// DeviceCodeLoadClient provides a mock function for the type Database
+func (_mock *Database) DeviceCodeLoadClient(ctx context.Context, tx *sql.Tx, deviceCode *record.DeviceCode) error {
+	ret := _mock.Called(ctx, tx, deviceCode)
+	if len(ret) == 0 {
+		panic("no return value specified for DeviceCodeLoadClient")
+	}
+	return ret.Error(0)
+}
+
+// DeviceCodeLoadUser provides a mock function for the type Database
+func (_mock *Database) DeviceCodeLoadUser(ctx context.Context, tx *sql.Tx, deviceCode *record.DeviceCode) error {
+	ret := _mock.Called(ctx, tx, deviceCode)
+	if len(ret) == 0 {
+		panic("no return value specified for DeviceCodeLoadUser")
+	}
+	return ret.Error(0)
+}
+
+// DeleteExpiredDeviceCodes provides a mock function for the type Database
+func (_mock *Database) DeleteExpiredDeviceCodes(ctx context.Context, tx *sql.Tx, now time.Time) error {
+	ret := _mock.Called(ctx, tx, now)
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteExpiredDeviceCodes")
+	}
+	return ret.Error(0)
+}

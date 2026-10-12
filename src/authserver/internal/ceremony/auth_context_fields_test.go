@@ -37,6 +37,8 @@ var requestFields = []string{
 	"DeferredErrorCode",
 	"DeferredErrorDescription",
 	"RequestedScope",
+	"DeviceCodeId",
+	"DeviceUserCode",
 }
 
 var attemptFields = []string{

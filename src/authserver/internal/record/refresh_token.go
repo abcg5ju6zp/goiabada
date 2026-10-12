@@ -30,6 +30,10 @@ type RefreshToken struct {
 	FirstRefreshTokenJti    string        `db:"first_refresh_token_jti"`
 	SessionIdentifier       string        `db:"session_identifier"`
 	RefreshTokenType        string        `db:"refresh_token_type"`
+	// GrantOrigin records the grant that issued this token's family (oidc.GrantOrigin*):
+	// authorization_code, ropc or device_code. The refresh redemption gates on the issuing
+	// grant's own client switch, which code_id alone cannot name once the device grant exists.
+	GrantOrigin             string        `db:"grant_origin"`
 	Scope                   string        `db:"scope"`
 	IssuedAt                sql.NullTime  `db:"issued_at"`
 	ExpiresAt               sql.NullTime  `db:"expires_at"`

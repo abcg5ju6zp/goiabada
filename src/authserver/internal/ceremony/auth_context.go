@@ -186,6 +186,14 @@ type AuthContext struct {
 	// deploy finishes at that answer rather than at a 500 and the window closes as the session
 	// cookies age out (#240).
 	TargetAcrLevel string
+	// DeviceCodeId marks an AuthContext created at the device verification page (RFC 8628)
+	// rather than at /auth/authorize: the pending device_codes row the user is confirming. Zero
+	// for an ordinary ceremony. The consent handler binds the approval to this row instead of
+	// issuing a code, and /auth/issue refuses a context that carries one. It is a request field,
+	// like ClientId and RequestedScope, so it survives a ceremony Restart.
+	DeviceCodeId int64
+	// DeviceUserCode is the presented user code, for audit, beside DeviceCodeId.
+	DeviceUserCode string
 	// RequestedScope is the scope as SetScope normalized it when /auth/authorize accepted the
 	// request, and it is never narrowed. Scope is the working copy: /auth/completed and /auth/issue
 	// narrow it in place to what the authenticated user holds, so after a restart it describes the

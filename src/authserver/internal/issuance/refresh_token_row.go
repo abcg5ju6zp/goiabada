@@ -94,14 +94,15 @@ func (t *TokenIssuer) generateRefreshToken(ctx context.Context, tx *sql.Tx, sett
 
 	// save 1st refresh token
 	refreshTokenEntity := &record.RefreshToken{
-		RefreshTokenJti:  jti,
-		IssuedAt:         sql.NullTime{Time: now, Valid: true},
-		ExpiresAt:        sql.NullTime{Time: time.Unix(claims["exp"].(int64), 0), Valid: true},
-		CodeId:           sql.NullInt64{Int64: code.Id, Valid: true},
-		RefreshTokenType: claims["typ"].(string),
-		Scope:            claims["scope"].(string),
-		Revoked:          false,
-	}
+			RefreshTokenJti:  jti,
+			IssuedAt:         sql.NullTime{Time: now, Valid: true},
+			ExpiresAt:        sql.NullTime{Time: time.Unix(claims["exp"].(int64), 0), Valid: true},
+			CodeId:           sql.NullInt64{Int64: code.Id, Valid: true},
+			RefreshTokenType: claims["typ"].(string),
+			GrantOrigin:      oidc.GrantOriginAuthorizationCode.String(),
+			Scope:            claims["scope"].(string),
+			Revoked:          false,
+		}
 
 	if refreshToken != nil {
 		refreshTokenEntity.PreviousRefreshTokenJti = refreshToken.RefreshTokenJti
@@ -188,11 +189,13 @@ func (t *TokenIssuer) getRefreshTokenMaxLifetime(ctx context.Context, tx *sql.Tx
 	return 0, errs.Errorf("invalid refresh token type: %v", refreshTokenType)
 }
 
-// generateRefreshTokenForROPC creates a refresh token specifically for ROPC flow.
-// Unlike auth code flow, ROPC tokens store UserId and ClientId directly on the RefreshToken
-// instead of referencing a Code entity.
-func (t *TokenIssuer) generateRefreshTokenForROPC(ctx context.Context, tx *sql.Tx, settings *record.Settings, input *ROPCGrantInput, scope string,
-	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string, previousRefreshToken *record.RefreshToken) (string, int64, error) {
+// generateRefreshTokenForCodelessGrant creates a refresh token storing UserId and ClientId
+// directly on the row instead of referencing a Code entity. It serves the two code-less grants:
+// the password grant (origin ropc) and the device grant (origin device_code); a rotation copies
+// the PARENT's origin, so a device family's child is never rebranded as ROPC or vice versa.
+func (t *TokenIssuer) generateRefreshTokenForCodelessGrant(ctx context.Context, tx *sql.Tx, settings *record.Settings, input *ROPCGrantInput, scope string,
+	now time.Time, signingKey *rsa.PrivateKey, keyIdentifier string, previousRefreshToken *record.RefreshToken,
+	origin oidc.GrantOrigin) (string, int64, error) {
 
 	claims := make(jwt.MapClaims)
 
@@ -230,16 +233,17 @@ func (t *TokenIssuer) generateRefreshTokenForROPC(ctx context.Context, tx *sql.T
 
 	// Create refresh token entity with direct UserId and ClientId (no Code reference)
 	refreshTokenEntity := &record.RefreshToken{
-		RefreshTokenJti:  jti,
-		IssuedAt:         sql.NullTime{Time: now, Valid: true},
-		ExpiresAt:        sql.NullTime{Time: time.Unix(claims["exp"].(int64), 0), Valid: true},
-		UserId:           sql.NullInt64{Int64: input.User.Id, Valid: true},
-		ClientId:         sql.NullInt64{Int64: input.Client.Id, Valid: true},
-		RefreshTokenType: claims["typ"].(string),
+			RefreshTokenJti:  jti,
+			IssuedAt:         sql.NullTime{Time: now, Valid: true},
+			ExpiresAt:        sql.NullTime{Time: time.Unix(claims["exp"].(int64), 0), Valid: true},
+			UserId:           sql.NullInt64{Int64: input.User.Id, Valid: true},
+			ClientId:         sql.NullInt64{Int64: input.Client.Id, Valid: true},
+			RefreshTokenType: claims["typ"].(string),
+		GrantOrigin:      origin.String(),
 		Scope:            claims["scope"].(string),
-		Revoked:          false,
-		MaxLifetime:      sql.NullTime{Time: time.Unix(maxLifetime, 0), Valid: true},
-	}
+			Revoked:          false,
+			MaxLifetime:      sql.NullTime{Time: time.Unix(maxLifetime, 0), Valid: true},
+		}
 
 	if previousRefreshToken != nil {
 		refreshTokenEntity.PreviousRefreshTokenJti = previousRefreshToken.RefreshTokenJti

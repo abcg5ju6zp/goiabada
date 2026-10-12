@@ -93,6 +93,23 @@
 "consent.scope.permission_template" = "Permissão {{.permission}} no recurso {{.resource}}"
 "consent.scope.authserver_manage_account.description" = "Gerenciar sua conta por você: alterar seu perfil, telefone, endereço e foto, ver e encerrar suas sessões e revogar consentimentos que você deu. Alterar seu e-mail, senha ou autenticação de dois fatores ainda exige sua senha."
 
+# --- Fluxo de autorização de dispositivo (RFC 8628, /device) -----------------
+
+"device.user_code.page_title" = "Inserir código do dispositivo"
+"device.user_code.title" = "Conectar um dispositivo"
+"device.user_code.instructions" = "Insira o código exibido no dispositivo com o qual você deseja entrar. Você pode digitá-lo com ou sem o traço."
+"device.user_code.field" = "Código do dispositivo"
+"device.user_code.placeholder" = "XXXX-XXXX"
+"device.user_code.error.invalid" = "Esse código não é válido ou expirou. Verifique o código no seu dispositivo e tente novamente."
+"device.user_code.button" = "Continuar"
+"device.completed.page_title" = "Entrada do dispositivo"
+"device.completed.approved.title" = "Dispositivo conectado"
+"device.completed.approved.message" = "Você pode voltar ao seu dispositivo. Ele está conectando você agora."
+"device.completed.denied.title" = "Entrada cancelada"
+"device.completed.denied.message" = "Você não autorizou o dispositivo. Você pode fechar esta página."
+"device.completed.expired.title" = "Código expirado"
+"device.completed.expired.message" = "O código expirou ou foi usado em outro lugar. Inicie a entrada novamente no seu dispositivo."
+
 # --- Confirmação de logout (auth/logout) -------------------------------------
 
 "logout_consent.page_title" = "Confirmação de saída"
@@ -779,7 +796,9 @@
 "adminconsole.admin_clients.oauth2_flows.client_creds_public_warning_prefix" = "A autenticação do seu cliente precisa estar configurada como "
 "adminconsole.admin_clients.oauth2_flows.client_creds_public_warning_em" = "confidencial"
 "adminconsole.admin_clients.oauth2_flows.client_creds_public_warning_suffix" = " para ativar o fluxo client credentials."
-"adminconsole.admin_clients.oauth2_flows.implicit_label" = "Fluxo Implicit"
+"adminconsole.admin_clients.oauth2_flows.device_label" = "Fluxo de autorização de dispositivo"
+"adminconsole.admin_clients.oauth2_flows.device_tooltip" = "RFC 8628 - O fluxo de autorização de dispositivo OAuth 2.0 permite que dispositivos com capacidade limitada de entrada, como smart TVs ou ferramentas de linha de comando, obtenham autorização do usuário: o dispositivo exibe um código, o usuário abre o URL de verificação em outro dispositivo, entra e confirma, e o dispositivo consulta o endpoint de token para receber seus tokens."
+"adminconsole.admin_clients.oauth2_flows.implicit_label" = "Fluxo implícito"
 "adminconsole.admin_clients.oauth2_flows.implicit_tooltip" = "RFC 6749 Seção 4.2 - O fluxo implicit retorna tokens diretamente do endpoint de autorização. Este fluxo está depreciado no OAuth 2.1 por questões de segurança."
 "adminconsole.admin_clients.oauth2_flows.implicit_warning" = "Atenção: o fluxo implicit está depreciado no OAuth 2.1 e tem vulnerabilidades de segurança conhecidas. Tokens são expostos em URLs e no histórico do navegador, e refresh tokens não podem ser emitidos. Use o fluxo authorization code com PKCE sempre que possível."
 "adminconsole.admin_clients.oauth2_flows.ropc_label" = "Resource Owner Password Credentials (ROPC)"

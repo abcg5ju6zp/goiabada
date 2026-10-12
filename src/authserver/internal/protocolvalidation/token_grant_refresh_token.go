@@ -44,7 +44,12 @@ type RefreshTokenGrant struct {
 	Client         *record.Client
 	RefreshToken   *record.RefreshToken
 	ScopeRequested string
-	IsROPC         bool
+	// IsROPC and IsDevice name the code-less grant that issued the token: the password grant or
+	// the device authorization grant. Both keep their user and client on the token row, but each
+	// is gated by, and mints through, its own branch. A token carrying neither descended from an
+	// authorization code.
+	IsROPC   bool
+	IsDevice bool
 }
 
 func (*RefreshTokenGrant) GrantType() oidc.GrantType { return oidc.GrantTypeRefreshToken }
@@ -107,17 +112,25 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 			invalidRefreshTokenMessage, http.StatusBadRequest)
 	}
 
-	// Determine if this is an auth code flow token (with CodeId) or ROPC token (with UserId/ClientId)
-	isROPCToken := !refreshToken.CodeId.Valid
+	// The issuing grant is read from the row's grant_origin, which migration 000063 backfilled
+	// for every existing row, rather than inferred from code_id: the password grant and the
+	// device grant both issue code-less tokens with their user and client on the row.
+	// Rows created before grant_origin was introduced are still represented by a NULL code_id.
+	// Keep accepting that legacy shape while migrated and newly issued rows use grant_origin.
+	isROPCToken := refreshToken.GrantOrigin == string(oidc.GrantOriginROPC) ||
+		(refreshToken.GrantOrigin == "" && !refreshToken.CodeId.Valid)
+	isDeviceToken := refreshToken.GrantOrigin == string(oidc.GrantOriginDeviceCode)
+	codeLessToken := isROPCToken || isDeviceToken
 
 	var tokenClientId int64
 	var tokenUserId int64
 	var tokenScope string
-	// tokenUser is the grant's user as loaded: the token row's for ROPC, the code's otherwise.
+	// tokenUser is the grant's user as loaded: the token row's for a code-less grant, the
+	// code's otherwise.
 	var tokenUser *record.User
 
-	if isROPCToken {
-		// ROPC refresh token - load User and Client directly from RefreshToken
+	if codeLessToken {
+		// ROPC or device refresh token - load User and Client directly from RefreshToken
 		err = val.database.RefreshTokenLoadUser(ctx, nil, refreshToken)
 		if err != nil {
 			return nil, err
@@ -180,13 +193,14 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 			invalidGenerationMessage, http.StatusBadRequest)
 	}
 
-	// An ROPC token issued before migration 000051 records no authentication instant, so no
-	// refresh of it can issue the auth_time OpenID Connect Core 1.0 section 12.2 requires, the
-	// time of the original authentication, and RFC 6749 section 5.2 answers a refresh token
-	// that cannot be used as invalid_grant. Its client makes one password grant again, and the
-	// new family records the instant (#125). After the ownership check, so another client
-	// presenting it learns nothing about the token beyond that it is not theirs.
-	if isROPCToken && !refreshToken.AuthenticatedAt.Valid {
+	// A code-less token issued without an authentication instant (an ROPC token from before
+	// migration 000051) cannot issue the auth_time OpenID Connect Core 1.0 section 12.2 requires,
+	// the time of the original authentication, and RFC 6749 section 5.2 answers a refresh token
+	// that cannot be used as invalid_grant. Its client makes the original grant again, and the
+	// new family records the instant (#125). The device grant records the approval's instant
+	// from its first token on. After the ownership check, so another client presenting it learns
+	// nothing about the token beyond that it is not theirs.
+	if codeLessToken && !refreshToken.AuthenticatedAt.Valid {
 		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			invalidRefreshTokenMessage, http.StatusBadRequest)
 	}
@@ -206,12 +220,13 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 	// session, because a session merely expiring must leave an offline grant working
 	// (decision 2). Termination has to be a positive fact for exactly that reason.
 	//
-	// ROPC is excluded because it has no grant origin to terminate: code_id is NULL,
-	// there is no session, and refreshToken.Code is the zero value on that path.
+	// A code-less grant is excluded because it has no code to revoke: the password grant has no
+	// grant origin to terminate, and the device grant's row is consumed at issuance; the codes
+	// table is not either one's origin and refreshToken.Code is the zero value on that path.
 	//
 	// Placed after the ownership check above so an unauthenticated presenter of someone
 	// else's token cannot learn from it that a session was ended (decision 7).
-	if !isROPCToken && refreshToken.Code.Revoked {
+	if !codeLessToken && refreshToken.Code.Revoked {
 		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			invalidTokenMessage, http.StatusBadRequest)
 	}
@@ -224,14 +239,14 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 	// It costs nothing: RefreshTokenLoadCode above already put the code in hand, so this
 	// is the same struct the revoked check just read, for the same kind of code-borne rule.
 	//
-	// ROPC is excluded by isROPCToken exactly as the revoked check excludes it: code_id is
-	// NULL, there is no code, and refreshToken.Code is the zero value on that path. On the
-	// auth code path a missing code row leaves the same zero value, so CodeChallenge.Valid
-	// is false and the token is refused. Fail-closed either way.
+	// A code-less grant is excluded exactly as the revoked check excludes it: there is no code,
+	// and refreshToken.Code is the zero value on that path. On the auth code path a missing code
+	// row leaves the same zero value, so CodeChallenge.Valid is false and the token is refused.
+	// Fail-closed either way.
 	//
 	// Placed after the ownership check above for the reason that check documents: an
 	// unauthenticated presenter of someone else's token learns nothing from it.
-	if !isROPCToken && client.IsPublic &&
+	if !codeLessToken && client.IsPublic &&
 		(!refreshToken.Code.CodeChallenge.Valid || refreshToken.Code.CodeChallenge.String == "") {
 		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_grant",
 			"This refresh token descends from an authorization code issued without PKCE, and public clients are required to use PKCE.",
@@ -340,10 +355,11 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 		// the grant expires.
 		//
 		// Placed after the max-lifetime check so an already-expired token is refused
-		// without a lookup, and ROPC excluded for the same reason as the revoked check
-		// above: code_id is NULL, refreshToken.Code is the zero value, and there was never
-		// a session to own the grant.
-		if !isROPCToken && refreshToken.Code.SessionIdentifier != "" {
+		// without a lookup, and a code-less grant excluded for the same reason as the revoked
+		// check above: refreshToken.Code is the zero value on that path. A device grant's
+		// approval session was already checked at the code's exchange; an offline grant
+		// outlives it by design.
+		if !codeLessToken && refreshToken.Code.SessionIdentifier != "" {
 			codeSession, getUserSessionErr := val.database.GetUserSessionBySessionIdentifier(ctx, nil, refreshToken.Code.SessionIdentifier)
 			if getUserSessionErr != nil {
 				return nil, getUserSessionErr
@@ -445,6 +461,9 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 	if !refreshToken.Revoked {
 		owed = userconsent.AlwaysOwed(client.ClientIdentifier, scopes)
 	}
+	// ROPC alone skips the consent check: its user handed over the password itself, which is that
+	// grant's implicit consent. A device grant confirmed through the login and consent pages, so
+	// its recorded consent is re-checked here exactly as an authorization code grant's is.
 	consentCheckRequired := !isROPCToken && (consentEveryScope || len(owed) > 0)
 	if consentCheckRequired {
 		consent, err := val.database.GetConsentByUserIdAndClientId(ctx, nil, tokenUserId, tokenClientId)
@@ -528,5 +547,6 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 		RefreshToken:   refreshToken,
 		ScopeRequested: input.Scope,
 		IsROPC:         isROPCToken,
+		IsDevice:       isDeviceToken,
 	}, nil
 }

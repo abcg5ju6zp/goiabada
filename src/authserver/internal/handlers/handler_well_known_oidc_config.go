@@ -31,6 +31,7 @@ func HandleWellKnownOIDCConfigGet(
 			Issuer:                           settings.Issuer,
 			AuthorizationEndpoint:            baseURL + "/auth/authorize",
 			TokenEndpoint:                    baseURL + "/auth/token",
+			DeviceAuthorizationEndpoint:      baseURL + "/auth/device",
 			UserInfoEndpoint:                 baseURL + "/userinfo",
 			EndSessionEndpoint:               baseURL + "/auth/logout",
 			JWKsURI:                          baseURL + "/certs",

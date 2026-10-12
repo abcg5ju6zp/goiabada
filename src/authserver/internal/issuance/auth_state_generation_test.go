@@ -9,6 +9,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/fake"
+	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -378,8 +379,8 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 			Run(func(args mock.Arguments) { captured = args.Get(2).(*record.RefreshToken) }).
 			Return(nil)
 
-		_, _, err := issuer.generateRefreshTokenForROPC(context.Background(), nil, settings, input, input.Scope, now, privKey, "test-kid", nil)
-		require.NoError(t, err, "generateRefreshTokenForROPC")
+		_, _, err := issuer.generateRefreshTokenForCodelessGrant(context.Background(), nil, settings, input, input.Scope, now, privKey, "test-kid", nil, oidc.GrantOriginROPC)
+	require.NoError(t, err, "generateRefreshTokenForCodelessGrant")
 		require.NotNil(t, captured, "CreateRefreshToken was never called")
 		assert.EqualValues(t, 7, captured.AuthStateGeneration)
 	})
@@ -408,8 +409,8 @@ func TestPersistedGeneration_Stamping(t *testing.T) {
 			Run(func(args mock.Arguments) { captured = args.Get(2).(*record.RefreshToken) }).
 			Return(nil)
 
-		_, _, err := issuer.generateRefreshTokenForROPC(context.Background(), nil, settings, input, input.Scope, now, privKey, "test-kid", parent)
-		require.NoError(t, err, "generateRefreshTokenForROPC")
+		_, _, err := issuer.generateRefreshTokenForCodelessGrant(context.Background(), nil, settings, input, input.Scope, now, privKey, "test-kid", parent, oidc.GrantOriginROPC)
+	require.NoError(t, err, "generateRefreshTokenForCodelessGrant")
 		require.NotNil(t, captured, "CreateRefreshToken was never called")
 		assert.EqualValues(t, 7, captured.AuthStateGeneration)
 	})

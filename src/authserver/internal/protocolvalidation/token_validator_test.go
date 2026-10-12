@@ -131,7 +131,7 @@ func TestValidateTokenRequest(t *testing.T) {
 	enabledClient := &record.Client{Id: 42, ClientIdentifier: "grant_table_client", Enabled: true}
 	mockDB.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "grant_table_client").Return(enabledClient, nil)
 
-	for _, grantType := range []string{"implicit", "PASSWORD", "urn:ietf:params:oauth:grant-type:device_code"} {
+	for _, grantType := range []string{"implicit", "PASSWORD"} {
 		t.Run("grant the table does not accept: "+grantType, func(t *testing.T) {
 			input := &ValidateTokenRequestInput{GrantType: oidc.GrantType(grantType), ClientId: "grant_table_client"}
 
@@ -150,7 +150,7 @@ func TestValidateTokenRequest(t *testing.T) {
 	// which refuses this otherwise empty request on its own terms (a flow switched off, or no
 	// client secret), never as an unsupported grant and never as the no-arm internal error.
 	for _, grantType := range []oidc.GrantType{oidc.GrantTypeAuthorizationCode, oidc.GrantTypeRefreshToken,
-		oidc.GrantTypeClientCredentials, oidc.GrantTypePassword} {
+		oidc.GrantTypeClientCredentials, oidc.GrantTypePassword, oidc.GrantTypeDeviceCode} {
 		t.Run("grant the table accepts reaches its arm: "+grantType.String(), func(t *testing.T) {
 			input := &ValidateTokenRequestInput{GrantType: grantType, ClientId: "grant_table_client"}
 

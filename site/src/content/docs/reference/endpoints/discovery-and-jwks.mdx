@@ -70,11 +70,12 @@ The auth server describes what it implements, which no setting changes but two: 
 | `issuer` | **Issuer**, under **Admin**, **General** in the admin console. A new installation starts with the auth server's base URL. Every token's `iss` is this value. |
 | `authorization_endpoint` | `/auth/authorize`, the [authorization endpoint](/reference/endpoints/authorize/) |
 | `token_endpoint` | `/auth/token`, the [token endpoint](/reference/endpoints/token/) |
+| `device_authorization_endpoint` | `/auth/device`, the [device authorization endpoint](/reference/endpoints/device-authorization/) for the RFC 8628 device flow |
 | `userinfo_endpoint` | `/userinfo`, the [UserInfo endpoint](/reference/endpoints/userinfo/) |
 | `end_session_endpoint` | `/auth/logout`, the [logout endpoint](/reference/endpoints/logout/) |
 | `jwks_uri` | `/certs`, the key set below |
 | `registration_endpoint` | `/connect/register`, only while dynamic client registration is on. See [Dynamic client registration](/reference/endpoints/dynamic-client-registration/). |
-| `grant_types_supported` | `authorization_code`, `refresh_token`, `client_credentials`, `password` and `implicit` |
+| `grant_types_supported` | `authorization_code`, `refresh_token`, `client_credentials`, `password`, `implicit` and `urn:ietf:params:oauth:grant-type:device_code` |
 | `response_types_supported` | `code`, `token`, `id_token` and `id_token token` |
 | `response_modes_supported` | `query`, `fragment` and `form_post` |
 | `prompt_values_supported` | `none`, `login` and `consent`. See [prompt](/concepts/prompt/). |

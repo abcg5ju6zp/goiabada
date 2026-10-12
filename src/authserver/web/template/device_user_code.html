@@ -1,0 +1,34 @@
+{{define "title"}}{{ .appName }} - {{ T $.ctx "device.user_code.page_title" }}{{end}}
+{{define "head"}}
+
+{{end}}
+
+{{define "body"}}
+
+    <h2 class='mb-2 text-xl font-semibold text-center'>{{ T $.ctx "device.user_code.title" }}</h2>
+    <form action="" method="post">
+
+        <div class="mb-3">
+
+            <p class="mt-5">{{ T $.ctx "device.user_code.instructions" }}</p>
+
+            <div class="w-full mt-6 form-control">
+                <label class="label">
+                    <span class="label-text text-base-content">{{ T $.ctx "device.user_code.field" }}</span>
+                </label>
+                <input type="text" name="user_code" value="{{.prefilledUserCode}}" placeholder="{{ T $.ctx "device.user_code.placeholder" }}"
+                    class="w-full input input-bordered uppercase tracking-widest text-center text-lg" autocomplete="off" autofocus
+                    maxlength="9" autocapitalize="characters" autocorrect="off" spellcheck="false" />
+            </div>
+
+        </div>
+
+        {{if .invalidUserCode}}
+            <p class="mt-8 text-center text-error">{{ T $.ctx "device.user_code.error.invalid" }}</p>
+        {{end}}
+
+        <button class="w-full mt-2 btn btn-primary">{{ T $.ctx "device.user_code.button" }}</button>
+
+    </form>
+
+{{end}}

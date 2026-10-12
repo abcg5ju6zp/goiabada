@@ -61,9 +61,14 @@ const (
 // therefore refused for the write in its body.
 var requestFieldSetters = []string{"SetTargetAcrLevel", "ParkDeferredError"}
 
-// requestFieldWriter names the one function whose body may write a request field: the handler that
-// accepts the authorization request. Function literals inside it are inside it.
-var requestFieldWriter = requestFieldFunc{pkg: requestFieldHandlersPath, name: "HandleAuthorizeGet"}
+// requestFieldWriters name the functions whose bodies may write a request field: the two
+// handlers that mint an AuthContext. HandleAuthorizeGet accepts the browser authorization
+// request; HandleDeviceVerificationPost accepts an RFC 8628 user code and starts the same
+// ceremony bound to the device code. Function literals inside either are inside it.
+var requestFieldWriters = []requestFieldFunc{
+	{pkg: requestFieldHandlersPath, name: "HandleAuthorizeGet"},
+	{pkg: requestFieldHandlersPath, name: "HandleDeviceVerificationPost"},
+}
 
 // requestFieldFunc is a function or method named by its package's import path, its receiver's type
 // name (empty for a function) and its own.
@@ -108,7 +113,7 @@ type requestFieldWalk struct {
 // Each of those written on a receiver whose type the checker could not determine, and naming a
 // request field or a setter, is returned as unresolved rather than guessed at.
 func findRequestFieldWrites(
-	root, scope string, fields, setters []string, writer requestFieldFunc,
+	root, scope string, fields, setters []string, writers []requestFieldFunc,
 ) (requestFieldWalk, error) {
 	var walk requestFieldWalk
 	start := filepath.Join(root, filepath.FromSlash(scope))
@@ -144,7 +149,7 @@ func findRequestFieldWrites(
 		setterNames: map[string]bool{},
 		fields:      map[*types.Var]string{},
 		setters:     map[*types.Func]string{},
-		writer:      writer,
+		writers:     writers,
 	}
 	for _, name := range fields {
 		rule.fieldNames[name] = true
@@ -195,7 +200,7 @@ type requestFieldRule struct {
 	setterNames map[string]bool
 	fields      map[*types.Var]string
 	setters     map[*types.Func]string
-	writer      requestFieldFunc
+	writers     []requestFieldFunc
 }
 
 // resolve finds each listed field and setter on AuthContext and returns the names it does not
@@ -246,8 +251,10 @@ func (rule *requestFieldRule) exempt(decl ast.Decl, pkgPath string) bool {
 			recv = ident.Name
 		}
 	}
-	if pkgPath == rule.writer.pkg && recv == rule.writer.recv && fn.Name.Name == rule.writer.name {
-		return true
+	for _, writer := range rule.writers {
+		if pkgPath == writer.pkg && recv == writer.recv && fn.Name.Name == writer.name {
+			return true
+		}
 	}
 	return pkgPath == requestFieldCeremonyPath && recv == "AuthContext" && rule.setterNames[fn.Name.Name]
 }
@@ -516,16 +523,16 @@ func requestFieldPackageName(importPath string) string {
 // TestRequestFields_WrittenOnlyAtAuthorize holds the real tree to the rule, with the request fields
 // the classification test names.
 func TestRequestFields_WrittenOnlyAtAuthorize(t *testing.T) {
-	assertRequestFieldsWrittenOnce(t, guard.SourceRoot(t), requestFieldScope, requestFields, requestFieldSetters, requestFieldWriter)
+	assertRequestFieldsWrittenOnce(t, guard.SourceRoot(t), requestFieldScope, requestFields, requestFieldSetters, requestFieldWriters)
 }
 
 // assertRequestFieldsWrittenOnce is the reporting half, taking the root, the scope and the lists as
 // parameters and failing through a guard.Reporter so a rule test can drive it against a fixture
 // tree.
-func assertRequestFieldsWrittenOnce(r guard.Reporter, root, scope string, fields, setters []string, writer requestFieldFunc) {
+func assertRequestFieldsWrittenOnce(r guard.Reporter, root, scope string, fields, setters []string, writers []requestFieldFunc) {
 	r.Helper()
 
-	walk, err := findRequestFieldWrites(root, scope, fields, setters, writer)
+	walk, err := findRequestFieldWrites(root, scope, fields, setters, writers)
 	if err != nil {
 		r.Fatalf("walking %s: %v", filepath.Join(root, filepath.FromSlash(scope)), err)
 	}
@@ -541,12 +548,16 @@ func assertRequestFieldsWrittenOnce(r guard.Reporter, root, scope string, fields
 	}
 
 	if len(walk.found) > 0 {
-		r.Errorf("%d write(s) under %s to an AuthContext request field outside %s:\n\t%s\n\n"+
-			"A request field is what /auth/authorize accepted, and a restart keeps it, which is only true "+
-			"while nothing after /auth/authorize writes one. Write it in %s, or, if the value is something an "+
+		writerNames := make([]string, len(writers))
+		for i, w := range writers {
+			writerNames[i] = w.name
+		}
+		r.Errorf("%d write(s) under %s to an AuthContext request field outside %v:\n\t%s\n\n"+
+			"A request field is what the accepting endpoint received, and a restart keeps it, which is only true "+
+			"while nothing after that handler writes one. Write it in one of %v, or, if the value is something an "+
 			"authentication decides, move the field to attemptFields in auth_context_fields_test.go so Restart "+
 			"discards it (#436).",
-			len(walk.found), scope, writer.name, requestFieldLines(walk.found), writer.name)
+			len(walk.found), scope, writerNames, requestFieldLines(walk.found), writerNames)
 	}
 	if len(walk.unresolved) > 0 {
 		r.Errorf("%d write(s) under %s to a field or setter named like an AuthContext request field, on a "+
@@ -755,7 +766,7 @@ func fixture(ac *ceremony.AuthContext) {
 }
 `)
 
-	walk, err := findRequestFieldWrites(root, requestFieldScope, requestFieldFixtureFields, requestFieldSetters, requestFieldWriter)
+	walk, err := findRequestFieldWrites(root, requestFieldScope, requestFieldFixtureFields, requestFieldSetters, requestFieldWriters)
 	require.NoError(t, err)
 	assert.Equal(t, 5, walk.files, "the test file is not read, the other five are")
 	assert.True(t, walk.authContextFound)
@@ -805,7 +816,7 @@ func issue(f *flow.Context) {
 }
 `)
 
-	walk, err := findRequestFieldWrites(root, requestFieldScope, requestFieldFixtureFields, requestFieldSetters, requestFieldWriter)
+	walk, err := findRequestFieldWrites(root, requestFieldScope, requestFieldFixtureFields, requestFieldSetters, requestFieldWriters)
 	require.NoError(t, err)
 	assert.Empty(t, walk.found)
 	assert.ElementsMatch(t, []string{
@@ -830,13 +841,13 @@ func completed(ac *ceremony.AuthContext, effective string) {
 `)
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertRequestFieldsWrittenOnce(r, root, requestFieldScope, requestFieldFixtureFields, requestFieldSetters, requestFieldWriter)
+		assertRequestFieldsWrittenOnce(r, root, requestFieldScope, requestFieldFixtureFields, requestFieldSetters, requestFieldWriters)
 	})
 
 	require.True(t, report.Failed(), "a request field written outside HandleAuthorizeGet passed the guard")
 	assert.False(t, report.Stopped, "a finding is an Errorf, not a Fatalf")
 	assert.Contains(t, report.Text(), "authserver/internal/handlers/handler_auth_completed.go:6: assigns State")
-	assert.Contains(t, report.Text(), "outside HandleAuthorizeGet")
+	assert.Contains(t, report.Text(), "outside [HandleAuthorizeGet HandleDeviceVerificationPost]")
 	assert.Contains(t, report.Text(), "#436")
 }
 
@@ -855,7 +866,7 @@ func issue(f *flow.Context) {
 `)
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertRequestFieldsWrittenOnce(r, root, requestFieldScope, requestFieldFixtureFields, requestFieldSetters, requestFieldWriter)
+		assertRequestFieldsWrittenOnce(r, root, requestFieldScope, requestFieldFixtureFields, requestFieldSetters, requestFieldWriters)
 	})
 
 	require.True(t, report.Failed(), "a write on an unresolvable receiver passed the guard")
@@ -881,7 +892,7 @@ func completed(store *ceremony.Store, ac *ceremony.AuthContext) []string {
 `)
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertRequestFieldsWrittenOnce(r, root, requestFieldScope, requestFieldFixtureFields, requestFieldSetters, requestFieldWriter)
+		assertRequestFieldsWrittenOnce(r, root, requestFieldScope, requestFieldFixtureFields, requestFieldSetters, requestFieldWriters)
 	})
 
 	assert.False(t, report.Failed(), "the writer or a read failed the guard: %s", report.Text())
@@ -895,7 +906,7 @@ func TestRequestFieldWrites_Guard_IsFatalOnAnEmptyRead(t *testing.T) {
 	writeRequestFieldFixture(t, root, "authserver/internal/ceremony/auth_context_test.go", "package ceremony\n")
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertRequestFieldsWrittenOnce(r, root, requestFieldScope, requestFieldFixtureFields, requestFieldSetters, requestFieldWriter)
+		assertRequestFieldsWrittenOnce(r, root, requestFieldScope, requestFieldFixtureFields, requestFieldSetters, requestFieldWriters)
 	})
 
 	require.True(t, report.Stopped, "an empty read must be fatal rather than a pass")
@@ -917,7 +928,7 @@ func issue(ac *AuthContext) {
 `)
 
 	report := guard.Run(func(r guard.Reporter) {
-		assertRequestFieldsWrittenOnce(r, root, requestFieldScope, requestFieldFixtureFields, requestFieldSetters, requestFieldWriter)
+		assertRequestFieldsWrittenOnce(r, root, requestFieldScope, requestFieldFixtureFields, requestFieldSetters, requestFieldWriters)
 	})
 
 	require.True(t, report.Stopped, "a walk that never found AuthContext must be fatal rather than a pass")
@@ -933,7 +944,7 @@ func TestRequestFieldWrites_Guard_IsFatalOnAnUndeclaredName(t *testing.T) {
 
 	report := guard.Run(func(r guard.Reporter) {
 		assertRequestFieldsWrittenOnce(r, root, requestFieldScope,
-			append(slices.Clone(requestFieldFixtureFields), "Nonce"), []string{"SetTargetAcrLevel", "SetNonce"}, requestFieldWriter)
+			append(slices.Clone(requestFieldFixtureFields), "Nonce"), []string{"SetTargetAcrLevel", "SetNonce"}, requestFieldWriters)
 	})
 
 	require.True(t, report.Stopped, "an undeclared name must be fatal rather than a pass")

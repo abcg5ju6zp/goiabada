@@ -363,3 +363,24 @@ func (_c *TokenIssuer_IssueRefreshTokenGrant_Call) RunAndReturn(run func(ctx con
 	_c.Call.Return(run)
 	return _c
 }
+
+// IssueDeviceCodeGrant provides a mock function for the type TokenIssuer. Appended in the
+// generated style by the device authorization grant change.
+func (_mock *TokenIssuer) IssueDeviceCodeGrant(ctx context.Context, settings *record.Settings, deviceCode *record.DeviceCode) (*oauth.TokenResponse, error) {
+	ret := _mock.Called(ctx, settings, deviceCode)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IssueDeviceCodeGrant")
+	}
+
+	var r0 *oauth.TokenResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *record.Settings, *record.DeviceCode) (*oauth.TokenResponse, error)); ok {
+		return returnFunc(ctx, settings, deviceCode)
+	}
+	if ret.Get(0) != nil {
+		r0 = ret.Get(0).(*oauth.TokenResponse)
+	}
+	r1 = ret.Error(1)
+	return r0, r1
+}

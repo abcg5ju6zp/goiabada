@@ -117,11 +117,12 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `client_identifier` | The identifier the client is known by, sent as `client_id` in OAuth requests. On a refusal at the token endpoint, it's the one the request named. |
 | `code_id` | The row id of an authorization code. |
 | `consent_id` | The row id of a consent a user gave a client. |
+| `device_code_id` | The row id of a device authorization (RFC 8628). |
 | `email` | The address of an account: the one created, activated, or given an email verification code. |
 | `email_destination` | The address an email verification code was sent to. |
 | `email_digest` | The SHA-256 hex digest of an address typed into a form nobody has signed in to, or named by a password grant. |
 | `first_refresh_token_jti` | The `jti` of the first refresh token in a replayed token's family. |
-| `flow` | How a refresh token's family began: `auth_code` or `ropc`. |
+| `flow` | How a refresh token's family began: `auth_code`, `ropc` or `device_code`. |
 | `grant_type` | The `grant_type` of a token request. |
 | `grant_types` | The grant types a client asked for when it registered itself. |
 | `granted_permission_ids` | The row ids of the permissions a client permission save granted. |
@@ -168,6 +169,7 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `route` | The route pattern of a refused Admin API request, such as `/api/v1/admin/users/{id}/permissions`. |
 | `scope` | The scope issued, or the scope a token request asked for and was refused. |
 | `scopes` | The administrative scopes a client asked for and was refused. |
+| `session_bound` | Whether an approved device authorization was bound to the user's browser session, true when the session was present. |
 | `session_identifier` | The identifier of a user's session. |
 | `step` | The time step of an authenticator code that was sent again. |
 | `target_id` | The row id of the user, group, client or resource a request acted on. |
@@ -231,6 +233,9 @@ This is every event the auth server writes, grouped by what raises it. The viewe
 | `token_issued_refresh_token_response` | The token endpoint exchanged a refresh token for new tokens. |
 | `token_issued_client_credentials_response` | The token endpoint issued an access token to a client through the client credentials flow. |
 | `token_issued_ropc_response` | The token endpoint issued tokens for a username and password, through the password grant. |
+| `token_issued_device_code_response` | The token endpoint exchanged an approved device code for tokens, through the OAuth 2.0 device authorization grant (RFC 8628). |
+| `device_authorization_approved` | A user approved a device at the verification page after signing in and consenting. |
+| `device_authorization_denied` | A user refused a device at the verification page's consent step. |
 | `token_issued_implicit_response` | The authorization endpoint issued tokens straight to a client, through the implicit flow. |
 | `token_scope_denied` | The token endpoint refused a request for a scope the client or user may not have, or an OpenID Connect scope on the client credentials grant, or a client credentials request that left `scope` out from a client holding no permissions, recorded with an empty `scope`. |
 | `ropc_auth_failed` | The token endpoint refused a password grant, because the email or password was wrong, or the user was disabled or has two-factor authentication on. |

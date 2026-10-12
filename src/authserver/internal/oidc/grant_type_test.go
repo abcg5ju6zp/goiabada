@@ -34,13 +34,14 @@ func TestGrantType_Traits(t *testing.T) {
 		{"password", GrantTypePassword, "password", true, true, false},
 		// Issued at the authorization endpoint only, so the token endpoint never redeems it.
 		{"implicit", GrantTypeImplicit, "implicit", false, false, false},
+		// RFC 8628 device_code: redeemed at the token endpoint, no scope parameter there, and
+		// DCR does not offer it.
+		{"device code", GrantTypeDeviceCode, "urn:ietf:params:oauth:grant-type:device_code", true, false, false},
 
 		{"empty", GrantType(""), "", false, false, false},
 		// Grant type values are case-sensitive; no table row matches a different spelling.
 		{"upper-case password", GrantType("PASSWORD"), "PASSWORD", false, false, false},
 		{"password with a trailing space", GrantType("password "), "password ", false, false, false},
-		{"device code", GrantType("urn:ietf:params:oauth:grant-type:device_code"),
-			"urn:ietf:params:oauth:grant-type:device_code", false, false, false},
 		// Response types, not grants.
 		{"code", GrantType("code"), "code", false, false, false},
 		{"token", GrantType("token"), "token", false, false, false},
@@ -62,7 +63,8 @@ func TestGrantType_Traits(t *testing.T) {
 // relying party reading discovery is told the server cannot do something it does.
 func TestGrantTypesSupported(t *testing.T) {
 	assert.Equal(t,
-		[]string{"authorization_code", "refresh_token", "client_credentials", "password", "implicit"},
+		[]string{"authorization_code", "refresh_token", "client_credentials", "password", "implicit",
+			"urn:ietf:params:oauth:grant-type:device_code"},
 		GrantTypesSupported())
 }
 

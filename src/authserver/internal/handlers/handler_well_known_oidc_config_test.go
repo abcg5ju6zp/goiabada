@@ -20,14 +20,15 @@ import (
 // of them shows up here as a change to what relying parties are told (#437).
 func expectedDiscoveryDocument() oidc.WellKnownConfig {
 	return oidc.WellKnownConfig{
-		Issuer:                "https://example.com",
-		AuthorizationEndpoint: testBaseURL + "/auth/authorize",
-		TokenEndpoint:         testBaseURL + "/auth/token",
-		UserInfoEndpoint:      testBaseURL + "/userinfo",
-		EndSessionEndpoint:    testBaseURL + "/auth/logout",
-		JWKsURI:               testBaseURL + "/certs",
+		Issuer:                      "https://example.com",
+		AuthorizationEndpoint:       testBaseURL + "/auth/authorize",
+		TokenEndpoint:               testBaseURL + "/auth/token",
+		DeviceAuthorizationEndpoint: testBaseURL + "/auth/device",
+		UserInfoEndpoint:            testBaseURL + "/userinfo",
+		EndSessionEndpoint:          testBaseURL + "/auth/logout",
+		JWKsURI:                     testBaseURL + "/certs",
 		// Every grant the server implements, in the grant table's order (#437).
-		GrantTypesSupported:              []string{"authorization_code", "refresh_token", "client_credentials", "password", "implicit"},
+		GrantTypesSupported:              []string{"authorization_code", "refresh_token", "client_credentials", "password", "implicit", "urn:ietf:params:oauth:grant-type:device_code"},
 		ResponseTypesSupported:           []string{"code", "token", "id_token", "id_token token"},
 		ResponseModesSupported:           []string{"query", "fragment", "form_post"},
 		PromptValuesSupported:            []string{"none", "login", "consent"},

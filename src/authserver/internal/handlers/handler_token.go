@@ -71,6 +71,8 @@ func HandleTokenPost(
 			responder.respondRefreshToken(w, r, settings, grant)
 		case *protocolvalidation.PasswordGrant:
 			responder.respondPassword(w, r, settings, grant)
+		case *protocolvalidation.DeviceCodeGrant:
+			responder.respondDeviceCode(w, r, settings, grant)
 		default:
 			// Reachable only if the validator returns a grant this endpoint has no responder for.
 			responder.refuse(w, r, input.GrantType, errs.Errorf("the token validator returned a grant (%T) the token endpoint does not answer", grant))
@@ -89,7 +91,7 @@ func requestedGrantType(r *http.Request) oidc.GrantType {
 // copies must agree. TestTokenRequestParameters_EveryReadIsListed holds the list to the reads (#228).
 var tokenRequestParameters = []string{
 	"grant_type", "code", "redirect_uri", "code_verifier", "client_id", "client_secret",
-	"scope", "refresh_token", "username", "password",
+	"scope", "refresh_token", "username", "password", "device_code",
 }
 
 // parseTokenRequest reads the token request's form into the validator's input, refusing what can be
@@ -172,10 +174,12 @@ func parseTokenRequest(r *http.Request) (*protocolvalidation.ValidateTokenReques
 		ClientSecret: clientSecret,
 		Scope:        normalizedScope,
 		RefreshToken: r.PostForm.Get("refresh_token"),
-		// ROPC parameters (RFC 6749 Section 4.3)
-		Username: r.PostForm.Get("username"),
-		Password: r.PostForm.Get("password"),
-	}, nil
+			// ROPC parameters (RFC 6749 Section 4.3)
+			Username: r.PostForm.Get("username"),
+			Password: r.PostForm.Get("password"),
+			// RFC 8628 section 3.4
+			DeviceCode: r.PostForm.Get("device_code"),
+		}, nil
 }
 
 // auditTokenRefusal records what a refused token request calls for, the audit events, the
@@ -396,6 +400,28 @@ func (tr tokenResponder) writeTokenResponse(w http.ResponseWriter, r *http.Reque
 // written through.
 func (tr tokenResponder) refuse(w http.ResponseWriter, r *http.Request, grantType oidc.GrantType, err error) {
 	tr.metrics.Refused(grantType, err)
+
+	// RFC 8628 section 3.5's poll answers carry the interval the device must wait next, which is
+	// not an RFC 6749 5.2 field, so they are rendered here in their own shape rather than through
+	// JSONError. Always 400, counted like every other refusal above.
+	var devicePollErr *protocolvalidation.DevicePollError
+	if errors.As(err, &devicePollErr) {
+		response := struct {
+			Error            string `json:"error"`
+			ErrorDescription string `json:"error_description,omitempty"`
+			Interval         int    `json:"interval,omitempty"`
+		}{
+			Error:            devicePollErr.Code,
+			ErrorDescription: devicePollErr.Description,
+			Interval:         devicePollErr.IntervalSeconds,
+		}
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Set("Pragma", "no-cache")
+		w.WriteHeader(http.StatusBadRequest)
+		tr.jsonWriter.EncodeJSON(w, r, response)
+		return
+	}
+
 	tr.jsonWriter.JSONError(w, r, err)
 }
 

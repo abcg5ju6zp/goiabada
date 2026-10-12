@@ -4,6 +4,7 @@ import (
 	"crypto/subtle"
 	"net/http"
 
+	"github.com/leodip/goiabada/authserver/internal/encryption"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -57,6 +58,23 @@ func (val *TokenValidator) authenticateClient(client *record.Client, presentedSe
 	}
 	return nil
 }
+
+// AuthenticateClient is authenticateClient's exported arm for the other endpoints that
+// authenticate a client outside the token endpoint: the device authorization endpoint
+// (RFC 8628 section 3.1), which must accept the same credentials and refuse them with the same
+// answers as the token endpoint so a device cannot be told two stories about one secret.
+func AuthenticateClient(dataCipher *encryption.DataCipher, client *record.Client, presentedSecret string) error {
+	val := &TokenValidator{dataCipher: dataCipher}
+	return val.authenticateClient(client, presentedSecret)
+}
+
+// ClientDoesNotExistErrorMsg and ClientDisabledErrorMsg are the prelude's two refusals the
+// device authorization endpoint answers as the token endpoint does.
+const ClientDoesNotExistErrorMsg = clientDoesNotExistErrorMsg
+const ClientDisabledErrorMsg = clientDisabledErrorMsg
+
+// ClientSecretRequiredErrorMsg is exported for the device endpoint's identical refusal.
+const ClientSecretRequiredErrorMsg = clientSecretRequiredErrorMsg
 
 // invalidClientError is every invalid_client the token endpoint answers: an unknown client, a
 // disabled one, and a missing or wrong secret. Always 401 with BasicChallenge, whether the client

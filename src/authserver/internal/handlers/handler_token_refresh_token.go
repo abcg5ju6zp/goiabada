@@ -37,6 +37,7 @@ func (tr tokenResponder) respondRefreshToken(w http.ResponseWriter, r *http.Requ
 		RefreshToken:   grant.RefreshToken,
 		ScopeRequested: grant.ScopeRequested,
 		IsROPC:         grant.IsROPC,
+		IsDevice:       grant.IsDevice,
 	})
 	var replayed *issuance.RefreshTokenReplayedError
 	switch {
@@ -49,6 +50,9 @@ func (tr tokenResponder) respondRefreshToken(w http.ResponseWriter, r *http.Requ
 		description := authCodeNotAuthorizedErrorMsg
 		if grant.IsROPC {
 			description = protocolvalidation.ROPCNotAuthorizedErrorMsg
+		}
+		if grant.IsDevice {
+			description = DeviceCodeNotAuthorizedErrorMsg
 		}
 		tr.refuse(w, r, oidc.GrantTypeRefreshToken, oauth.NewErrorDetailWithHTTPStatus("unauthorized_client",
 			description, http.StatusBadRequest))
@@ -66,12 +70,16 @@ func (tr tokenResponder) respondRefreshToken(w http.ResponseWriter, r *http.Requ
 	}
 
 	refreshToken := grant.RefreshToken
-	if grant.IsROPC {
+	if grant.IsROPC || grant.IsDevice {
+		flow := "ropc"
+		if grant.IsDevice {
+			flow = "device_code"
+		}
 		tr.auditLogger.Log(r.Context(), audit.EventTokenIssuedRefreshTokenResponse, map[string]interface{}{
 			"user_id":           refreshToken.UserId.Int64,
 			"client_id":         refreshToken.ClientId.Int64,
 			"refresh_token_jti": refreshToken.RefreshTokenJti,
-			"flow":              "ropc",
+			"flow":              flow,
 		})
 	} else {
 		if outcome.BumpedSession != nil {
@@ -121,7 +129,10 @@ func (tr tokenResponder) auditRefreshTokenReplay(ctx context.Context, grant *pro
 	replayClientId := refreshToken.ClientId.Int64
 	replayUserId := refreshToken.UserId.Int64
 	replayFlow := "ropc"
-	if !grant.IsROPC {
+	switch {
+	case grant.IsDevice:
+		replayFlow = "device_code"
+	case !grant.IsROPC:
 		replayClientId = refreshToken.Code.ClientId
 		replayUserId = refreshToken.Code.UserId
 		replayFlow = "auth_code"

@@ -121,6 +121,18 @@ func (s *Server) initRoutes(branches appBranches) {
 	protocol.With(rateLimiter.LimitDCR).Post("/connect/register",
 		handlers.HandleDynamicClientRegistrationPost(s.database, auditLogger, s.dataCipher))
 
+	// OAuth 2.0 Device Authorization Grant endpoint (RFC 8628 section 3.1). Like the token
+	// endpoint it is a server-to-server JSON route on the protocol branch.
+	protocol.Post("/auth/device",
+		handlers.HandleDeviceAuthorizationPost(httpHelper, s.database, authorizeValidator, s.dataCipher, baseURL))
+
+	// RFC 8628 verification pages, where a person enters the user code and, after the existing
+	// login and consent ceremony, confirms the device. These are pages and carry the session
+	// cookie, so they live on the pages branch and its CSRF protection.
+	pages.Get(handlers.DeviceAuthorizationPath, handlers.HandleDeviceVerificationGet(httpHelper))
+	pages.Post(handlers.DeviceAuthorizationPath, handlers.HandleDeviceVerificationPost(httpHelper, ceremonyStore, s.database, baseURL))
+	pages.Get(handlers.DeviceAuthorizationPath+"/completed", handlers.HandleDeviceCompletedGet(httpHelper))
+
 	// Public API endpoints (no authentication required)
 	publicSettingsHandler := handlers.NewPublicSettings(s.database)
 	api.Get("/api/public/settings", publicSettingsHandler.ServeHTTP)

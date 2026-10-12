@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/core/oauth"
 )
@@ -105,7 +106,7 @@ func (t *TokenIssuer) IssuePasswordGrant(ctx context.Context, settings *record.S
 	}
 
 	// Generate refresh token with direct UserId/ClientId (no Code entity needed)
-	refreshToken, refreshExpiresIn, err := t.generateRefreshTokenForROPC(ctx, nil, settings, input, input.Scope, now, privKey, keyIdentifier, nil)
+	refreshToken, refreshExpiresIn, err := t.generateRefreshTokenForCodelessGrant(ctx, nil, settings, input, input.Scope, now, privKey, keyIdentifier, nil, oidc.GrantOriginROPC)
 	if err != nil {
 		return nil, err
 	}

@@ -30,6 +30,11 @@ var refusalCodes = []string{
 	"unauthorized_client",
 	"unsupported_grant_type",
 	"invalid_scope",
+	// RFC 8628 section 3.5, the device_code grant's poll answers.
+	"authorization_pending",
+	"slow_down",
+	"access_denied",
+	"expired_token",
 	serverError,
 }
 
@@ -72,6 +77,12 @@ func (r *Recorder) Refused(grantType oidc.GrantType, err error) {
 	var detail *oauth.ErrorDetail
 	if errors.As(err, &detail) {
 		code = detail.Code()
+	}
+	// The device_code grant's poll errors are not an *oauth.ErrorDetail because they carry an
+	// interval, so their code is taken through this small interface.
+	var pollErr interface{ ErrorCode() string }
+	if errors.As(err, &pollErr) {
+		code = pollErr.ErrorCode()
 	}
 	r.refused.Inc(grantType.String(), code)
 }

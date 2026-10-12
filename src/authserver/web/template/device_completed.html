@@ -1,0 +1,19 @@
+{{define "title"}}{{ .appName }} - {{ T $.ctx "device.completed.page_title" }}{{end}}
+{{define "head"}}
+
+{{end}}
+
+{{define "body"}}
+
+    {{if eq .deviceResult "approved"}}
+    <h2 class='mb-2 text-xl font-semibold text-center'>{{ T $.ctx "device.completed.approved.title" }}</h2>
+    <p class="mt-5 text-center">{{ T $.ctx "device.completed.approved.message" }}</p>
+    {{else if eq .deviceResult "denied"}}
+    <h2 class='mb-2 text-xl font-semibold text-center'>{{ T $.ctx "device.completed.denied.title" }}</h2>
+    <p class="mt-5 text-center">{{ T $.ctx "device.completed.denied.message" }}</p>
+    {{else}}
+    <h2 class='mb-2 text-xl font-semibold text-center'>{{ T $.ctx "device.completed.expired.title" }}</h2>
+    <p class="mt-5 text-center">{{ T $.ctx "device.completed.expired.message" }}</p>
+    {{end}}
+
+{{end}}

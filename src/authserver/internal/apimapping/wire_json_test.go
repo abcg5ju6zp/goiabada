@@ -598,6 +598,7 @@ func TestWireJSON_ClientFamily(t *testing.T) {
 			`,"showLogo":true,"showDisplayName":true,` +
 			`"showDescription":false,"showWebsiteUrl":true,"isPublic":false,"isSystemLevelClient":` + flag +
 			`,"authorizationCodeEnabled":true,"clientCredentialsEnabled":false,` +
+			`"deviceAuthorizationGrantEnabled":false,` +
 			`"pkceRequired":true,"implicitGrantEnabled":null,` +
 			`"resourceOwnerPasswordCredentialsEnabled":false,"tokenExpirationInSeconds":300,` +
 			`"refreshTokenOfflineIdleTimeoutInSeconds":3600,` +
