@@ -35,6 +35,10 @@ type Client struct {
 	IsPublic                    bool `db:"is_public"`
 	AuthorizationCodeEnabled    bool `db:"authorization_code_enabled"`
 	ClientCredentialsEnabled    bool `db:"client_credentials_enabled"`
+	// TokenExchangeEnabled records that this confidential client is allowed to use the RFC 8693
+	// token exchange grant at the token endpoint. It is off by default: a client is handed
+	// down-scoped tokens minted for another party only once an operator explicitly permits it.
+	TokenExchangeEnabled bool `db:"token_exchange_enabled"`
 	// PKCERequired overrides global setting if set.
 	// nil = use global setting, true = PKCE required, false = PKCE optional
 	PKCERequired *bool `db:"pkce_required"`

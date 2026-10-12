@@ -120,10 +120,10 @@ func TestHandleTokenPost_CountsEachRefusalUnderItsGrantAndErrorCode(t *testing.T
 			want: `goiabada_token_requests_refused_total{grant_type="other",error="unsupported_grant_type"} 1`,
 		},
 		{
-			name: "a code outside RFC 6749 section 5.2 is other",
+			name: "a code outside the token endpoint's published set is other",
 			arm: func(e *tokenEndpoint) {
 				e.validator.On("ValidateTokenRequest", mock.Anything, mock.Anything, mock.Anything).
-					Return(nil, refusal("invalid_target", http.StatusBadRequest)).Once()
+					Return(nil, refusal("temporarily_unavailable", http.StatusBadRequest)).Once()
 			},
 			form: "grant_type=password&client_id=test_client&username=u&password=p",
 			want: `goiabada_token_requests_refused_total{grant_type="password",error="other"} 1`,

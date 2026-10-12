@@ -35,6 +35,7 @@ func HandleWellKnownOIDCConfigGet(
 			EndSessionEndpoint:               baseURL + "/auth/logout",
 			JWKsURI:                          baseURL + "/certs",
 			GrantTypesSupported:              oidc.GrantTypesSupported(),
+			TokenExchangeTokenTypesSupported: oidc.TokenExchangeTokenTypesSupported(),
 			ResponseTypesSupported:           protocolvalidation.SupportedResponseTypes(),
 			ResponseModesSupported:           protocolvalidation.SupportedResponseModes(),
 			PromptValuesSupported:            []string{"none", "login", "consent"},
@@ -43,7 +44,7 @@ func HandleWellKnownOIDCConfigGet(
 			IdTokenSigningAlgValuesSupported: []string{"RS256"},
 			ScopesSupported:                  oidc.SupportedScopes(),
 			ClaimsSupported: []string{
-				"iss", "iat", "nbf", "auth_time", "jti", "acr", "amr", "sid", "aud", "typ", "exp", "nonce", "auth_state_generation",
+				"iss", "iat", "nbf", "auth_time", "jti", "acr", "amr", "sid", "aud", "typ", "exp", "nonce", "auth_state_generation", "act",
 				"sub",                                                                                                                                                                            // openid
 				"name", "given_name", "middle_name", "family_name", "nickname", "preferred_username", "profile", "picture", "website", "gender", "birthdate", "zoneinfo", "locale", "updated_at", // profile
 				"email", "email_verified", // email

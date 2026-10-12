@@ -363,3 +363,77 @@ func (_c *TokenIssuer_IssueRefreshTokenGrant_Call) RunAndReturn(run func(ctx con
 	_c.Call.Return(run)
 	return _c
 }
+
+// IssueTokenExchangeGrant provides a mock function for the type TokenIssuer
+func (_mock *TokenIssuer) IssueTokenExchangeGrant(ctx context.Context, settings *record.Settings, input *issuance.TokenExchangeInput) (*oauth.TokenResponse, error) {
+	ret := _mock.Called(ctx, settings, input)
+
+	if len(ret) == 0 {
+		panic("no return value specified for IssueTokenExchangeGrant")
+	}
+
+	var r0 *oauth.TokenResponse
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *record.Settings, *issuance.TokenExchangeInput) (*oauth.TokenResponse, error)); ok {
+		return returnFunc(ctx, settings, input)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *record.Settings, *issuance.TokenExchangeInput) *oauth.TokenResponse); ok {
+		r0 = returnFunc(ctx, settings, input)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*oauth.TokenResponse)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *record.Settings, *issuance.TokenExchangeInput) error); ok {
+		r1 = returnFunc(ctx, settings, input)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// TokenIssuer_IssueTokenExchangeGrant_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'IssueTokenExchangeGrant'
+type TokenIssuer_IssueTokenExchangeGrant_Call struct {
+	*mock.Call
+}
+
+// IssueTokenExchangeGrant is a helper method to define mock.On call
+//   - ctx context.Context
+//   - settings *record.Settings
+//   - input *issuance.TokenExchangeInput
+func (_e *TokenIssuer_Expecter) IssueTokenExchangeGrant(ctx any, settings any, input any) *TokenIssuer_IssueTokenExchangeGrant_Call {
+	return &TokenIssuer_IssueTokenExchangeGrant_Call{Call: _e.mock.On("IssueTokenExchangeGrant", ctx, settings, input)}
+}
+
+func (_c *TokenIssuer_IssueTokenExchangeGrant_Call) Run(run func(ctx context.Context, settings *record.Settings, input *issuance.TokenExchangeInput)) *TokenIssuer_IssueTokenExchangeGrant_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *record.Settings
+		if args[1] != nil {
+			arg1 = args[1].(*record.Settings)
+		}
+		var arg2 *issuance.TokenExchangeInput
+		if args[2] != nil {
+			arg2 = args[2].(*issuance.TokenExchangeInput)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *TokenIssuer_IssueTokenExchangeGrant_Call) Return(tokenResponse *oauth.TokenResponse, err error) *TokenIssuer_IssueTokenExchangeGrant_Call {
+	_c.Call.Return(tokenResponse, err)
+	return _c
+}
+
+func (_c *TokenIssuer_IssueTokenExchangeGrant_Call) RunAndReturn(run func(ctx context.Context, settings *record.Settings, input *issuance.TokenExchangeInput) (*oauth.TokenResponse, error)) *TokenIssuer_IssueTokenExchangeGrant_Call {
+	_c.Call.Return(run)
+	return _c
+}

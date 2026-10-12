@@ -32,9 +32,11 @@ type tokenValidatorDatabase interface {
 	CodeLoadClient(ctx context.Context, tx *sql.Tx, code *record.Code) error
 	CodeLoadUser(ctx context.Context, tx *sql.Tx, code *record.Code) error
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
+	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
 	GetCodeByCodeHash(ctx context.Context, tx *sql.Tx, codeHash string, used bool) (*record.Code, error)
 	GetConsentByUserIdAndClientId(ctx context.Context, tx *sql.Tx, userId int64, clientId int64) (*record.UserConsent, error)
 	GetRefreshTokenByJti(ctx context.Context, tx *sql.Tx, jti string) (*record.RefreshToken, error)
+	GetTokenExchangeByIssuedJti(ctx context.Context, tx *sql.Tx, exchangeJti string) (*record.TokenExchange, error)
 	GetUserByEmail(ctx context.Context, tx *sql.Tx, email string) (*record.User, error)
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
@@ -76,6 +78,14 @@ type ValidateTokenRequestInput struct {
 	// Username and Password are used for ROPC grant (RFC 6749 Section 4.3)
 	Username string
 	Password string
+	// RFC 8693 token exchange (RFC 8693 section 2.1)
+	SubjectToken       string
+	SubjectTokenType   string
+	RequestedTokenType string
+	Audience           string
+	Resource           string
+	ActorToken         string
+	ActorTokenType     string
 }
 
 // TokenGrant is what a validated token request is: one type per grant, declared beside the method
@@ -127,6 +137,8 @@ func (val *TokenValidator) ValidateTokenRequest(ctx context.Context, settings *r
 		return asTokenGrant(val.validateRefreshTokenGrant(ctx, settings, client, input))
 	case oidc.GrantTypePassword:
 		return asTokenGrant(val.validatePasswordGrant(ctx, settings, client, input))
+	case oidc.GrantTypeTokenExchange:
+		return asTokenGrant(val.validateTokenExchangeGrant(ctx, settings, client, input))
 	default:
 		// Reachable only if the grant table accepts a grant this switch has no arm for; the
 		// validator's tests hold the two in agreement.

@@ -74,7 +74,8 @@ The auth server describes what it implements, which no setting changes but two: 
 | `end_session_endpoint` | `/auth/logout`, the [logout endpoint](/reference/endpoints/logout/) |
 | `jwks_uri` | `/certs`, the key set below |
 | `registration_endpoint` | `/connect/register`, only while dynamic client registration is on. See [Dynamic client registration](/reference/endpoints/dynamic-client-registration/). |
-| `grant_types_supported` | `authorization_code`, `refresh_token`, `client_credentials`, `password` and `implicit` |
+| `grant_types_supported` | `authorization_code`, `refresh_token`, `client_credentials`, `password`, the RFC 8693 `urn:ietf:params:oauth:grant-type:token-exchange` grant and `implicit` |
+| `token_exchange_token_types_supported` | The RFC 8693 token type URNs the token exchange grant accepts as subject and actor tokens and issues in: `urn:ietf:params:oauth:token-type:access_token` and `urn:ietf:params:oauth:token-type:refresh_token` |
 | `response_types_supported` | `code`, `token`, `id_token` and `id_token token` |
 | `response_modes_supported` | `query`, `fragment` and `form_post` |
 | `prompt_values_supported` | `none`, `login` and `consent`. See [prompt](/concepts/prompt/). |

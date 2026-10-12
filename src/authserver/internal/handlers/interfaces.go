@@ -63,6 +63,10 @@ type TokenIssuer interface {
 	// IssuePasswordGrant issues the resource owner password credentials grant, RFC 6749 section 4.3.
 	// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
 	IssuePasswordGrant(ctx context.Context, settings *record.Settings, input *issuance.ROPCGrantInput) (*oauth.TokenResponse, error)
+	// IssueTokenExchangeGrant issues the RFC 8693 token exchange grant: a down-scoped access token
+	// for a subject, recorded with its full lineage and returned idempotently for a repeated
+	// exchange.
+	IssueTokenExchangeGrant(ctx context.Context, settings *record.Settings, input *issuance.TokenExchangeInput) (*oauth.TokenResponse, error)
 }
 
 // ImplicitTokenIssuer is the one issuance /auth/issue performs itself: the implicit grant's tokens,

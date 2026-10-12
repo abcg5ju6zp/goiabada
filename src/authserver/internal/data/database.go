@@ -688,6 +688,18 @@ type Database interface {
 	// DeleteOrphanedRefreshTokenFamilyRevocations removes the records of families that have no
 	// refresh token left, which is when a record has nothing left to refuse.
 	DeleteOrphanedRefreshTokenFamilyRevocations(ctx context.Context, tx *sql.Tx) error
+
+	// CreateTokenExchange writes one completed RFC 8693 token exchange in the caller's transaction:
+	// the issued token, encrypted, and the lineage it descends from. Its request_hash unique key is
+	// what makes a retried or concurrent identical exchange return the stored token rather than
+	// minting a second lineage.
+	CreateTokenExchange(ctx context.Context, tx *sql.Tx, exchange *record.TokenExchange) error
+	// GetTokenExchangeByRequestHash answers the idempotency lookup before an exchange mints.
+	GetTokenExchangeByRequestHash(ctx context.Context, tx *sql.Tx, requestHash string) (*record.TokenExchange, error)
+	// GetTokenExchangeByIssuedJti answers the bearer session guard's lineage lookup for a presented
+	// token that carries an act claim, so a disabled client or revoked source grant invalidates a
+	// token already descended here.
+	GetTokenExchangeByIssuedJti(ctx context.Context, tx *sql.Tx, exchangeJti string) (*record.TokenExchange, error)
 	GetRefreshTokenById(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (*record.RefreshToken, error)
 	GetRefreshTokenByJti(ctx context.Context, tx *sql.Tx, jti string) (*record.RefreshToken, error)
 	GetRefreshTokensByCodeId(ctx context.Context, tx *sql.Tx, codeId int64) ([]*record.RefreshToken, error)

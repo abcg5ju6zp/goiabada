@@ -21,8 +21,8 @@ import (
 // with, which is what render's JSONError writes for one.
 const serverError = "server_error"
 
-// refusalCodes are the error codes RFC 6749 section 5.2 lists for a token request, and the
-// server_error a fault is answered with.
+// refusalCodes are the error codes RFC 6749 section 5.2 lists for a token request, RFC 8693
+// section 2.2.2's invalid_target, and the server_error a fault is answered with.
 var refusalCodes = []string{
 	"invalid_request",
 	"invalid_client",
@@ -30,6 +30,7 @@ var refusalCodes = []string{
 	"unauthorized_client",
 	"unsupported_grant_type",
 	"invalid_scope",
+	"invalid_target",
 	serverError,
 }
 

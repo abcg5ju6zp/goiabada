@@ -71,6 +71,8 @@ func HandleTokenPost(
 			responder.respondRefreshToken(w, r, settings, grant)
 		case *protocolvalidation.PasswordGrant:
 			responder.respondPassword(w, r, settings, grant)
+		case *protocolvalidation.TokenExchangeGrant:
+			responder.respondTokenExchange(w, r, settings, grant)
 		default:
 			// Reachable only if the validator returns a grant this endpoint has no responder for.
 			responder.refuse(w, r, input.GrantType, errs.Errorf("the token validator returned a grant (%T) the token endpoint does not answer", grant))
@@ -90,6 +92,9 @@ func requestedGrantType(r *http.Request) oidc.GrantType {
 var tokenRequestParameters = []string{
 	"grant_type", "code", "redirect_uri", "code_verifier", "client_id", "client_secret",
 	"scope", "refresh_token", "username", "password",
+	// RFC 8693 token exchange parameters.
+	"subject_token", "subject_token_type", "requested_token_type", "audience", "resource",
+	"actor_token", "actor_token_type",
 }
 
 // parseTokenRequest reads the token request's form into the validator's input, refusing what can be
@@ -175,6 +180,14 @@ func parseTokenRequest(r *http.Request) (*protocolvalidation.ValidateTokenReques
 		// ROPC parameters (RFC 6749 Section 4.3)
 		Username: r.PostForm.Get("username"),
 		Password: r.PostForm.Get("password"),
+		// RFC 8693 token exchange parameters (section 2.1)
+		SubjectToken:       r.PostForm.Get("subject_token"),
+		SubjectTokenType:   r.PostForm.Get("subject_token_type"),
+		RequestedTokenType: r.PostForm.Get("requested_token_type"),
+		Audience:           r.PostForm.Get("audience"),
+		Resource:           r.PostForm.Get("resource"),
+		ActorToken:         r.PostForm.Get("actor_token"),
+		ActorTokenType:     r.PostForm.Get("actor_token_type"),
 	}, nil
 }
 

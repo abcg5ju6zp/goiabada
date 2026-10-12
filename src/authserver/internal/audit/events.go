@@ -45,6 +45,9 @@ const (
 	// RFC 6749 Section 4.3
 	// SECURITY NOTE: ROPC is deprecated in OAuth 2.1 due to credential exposure risks.
 	EventTokenIssuedROPCResponse = "token_issued_ropc_response" //nolint:gosec // G101: an audit event name, not a credential
+	// EventTokenIssuedTokenExchangeResponse is logged when an RFC 8693 token exchange issued its
+	// one access token. The lineage the event summarizes lives on the token_exchanges row.
+	EventTokenIssuedTokenExchangeResponse = "token_issued_token_exchange_response"
 	// EventTokenScopeDenied is logged when a token request fails scope validation, on any grant
 	// type. Emitted from a single call site in HandleTokenPost, after ValidateTokenRequest has
 	// failed with an invalid_scope error, so every row follows a successful authentication of
@@ -538,6 +541,7 @@ var auditEventTypes = []string{
 	EventTokenIssuedImplicitResponse,
 	EventTokenIssuedRefreshTokenResponse,
 	EventTokenIssuedROPCResponse,
+	EventTokenIssuedTokenExchangeResponse,
 	EventTokenScopeDenied,
 	EventUpdatedAuditLogsSettings,
 	EventUpdatedClientAdministrativeScopes,

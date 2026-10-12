@@ -2281,6 +2281,69 @@ func (_c *Database_CreateSettings_Call) RunAndReturn(run func(ctx context.Contex
 	return _c
 }
 
+// CreateTokenExchange provides a mock function for the type Database
+func (_mock *Database) CreateTokenExchange(ctx context.Context, tx *sql.Tx, exchange *record.TokenExchange) error {
+	ret := _mock.Called(ctx, tx, exchange)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateTokenExchange")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, *record.TokenExchange) error); ok {
+		r0 = returnFunc(ctx, tx, exchange)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// Database_CreateTokenExchange_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateTokenExchange'
+type Database_CreateTokenExchange_Call struct {
+	*mock.Call
+}
+
+// CreateTokenExchange is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - exchange *record.TokenExchange
+func (_e *Database_Expecter) CreateTokenExchange(ctx any, tx any, exchange any) *Database_CreateTokenExchange_Call {
+	return &Database_CreateTokenExchange_Call{Call: _e.mock.On("CreateTokenExchange", ctx, tx, exchange)}
+}
+
+func (_c *Database_CreateTokenExchange_Call) Run(run func(ctx context.Context, tx *sql.Tx, exchange *record.TokenExchange)) *Database_CreateTokenExchange_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 *record.TokenExchange
+		if args[2] != nil {
+			arg2 = args[2].(*record.TokenExchange)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_CreateTokenExchange_Call) Return(err error) *Database_CreateTokenExchange_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *Database_CreateTokenExchange_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, exchange *record.TokenExchange) error) *Database_CreateTokenExchange_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreateUser provides a mock function for the type Database
 func (_mock *Database) CreateUser(ctx context.Context, tx *sql.Tx, user *record.User) error {
 	ret := _mock.Called(ctx, tx, user)
@@ -9139,6 +9202,154 @@ func (_c *Database_GetUserAttributesByUserId_Call) Return(userAttributes []recor
 }
 
 func (_c *Database_GetUserAttributesByUserId_Call) RunAndReturn(run func(ctx context.Context, tx *sql.Tx, userId int64) ([]record.UserAttribute, error)) *Database_GetUserAttributesByUserId_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetTokenExchangeByIssuedJti provides a mock function for the type Database
+func (_mock *Database) GetTokenExchangeByIssuedJti(ctx context.Context, tx *sql.Tx, exchangeJti string) (*record.TokenExchange, error) {
+	ret := _mock.Called(ctx, tx, exchangeJti)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetTokenExchangeByIssuedJti")
+	}
+
+	var r0 *record.TokenExchange
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) (*record.TokenExchange, error)); ok {
+		return returnFunc(ctx, tx, exchangeJti)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) *record.TokenExchange); ok {
+		r0 = returnFunc(ctx, tx, exchangeJti)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*record.TokenExchange)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string) error); ok {
+		r1 = returnFunc(ctx, tx, exchangeJti)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetTokenExchangeByIssuedJti_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetTokenExchangeByIssuedJti'
+type Database_GetTokenExchangeByIssuedJti_Call struct {
+	*mock.Call
+}
+
+// GetTokenExchangeByIssuedJti is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - exchangeJti string
+func (_e *Database_Expecter) GetTokenExchangeByIssuedJti(ctx any, tx any, exchangeJti any) *Database_GetTokenExchangeByIssuedJti_Call {
+	return &Database_GetTokenExchangeByIssuedJti_Call{Call: _e.mock.On("GetTokenExchangeByIssuedJti", ctx, tx, exchangeJti)}
+}
+
+func (_c *Database_GetTokenExchangeByIssuedJti_Call) Run(run func(ctx context.Context, tx *sql.Tx, exchangeJti string)) *Database_GetTokenExchangeByIssuedJti_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetTokenExchangeByIssuedJti_Call) Return(exchange *record.TokenExchange, err error) *Database_GetTokenExchangeByIssuedJti_Call {
+	_c.Call.Return(exchange, err)
+	return _c
+}
+
+func (_c *Database_GetTokenExchangeByIssuedJti_Call) RunAndReturn(run func(context.Context, *sql.Tx, string) (*record.TokenExchange, error)) *Database_GetTokenExchangeByIssuedJti_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetTokenExchangeByRequestHash provides a mock function for the type Database
+func (_mock *Database) GetTokenExchangeByRequestHash(ctx context.Context, tx *sql.Tx, requestHash string) (*record.TokenExchange, error) {
+	ret := _mock.Called(ctx, tx, requestHash)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetTokenExchangeByRequestHash")
+	}
+
+	var r0 *record.TokenExchange
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) (*record.TokenExchange, error)); ok {
+		return returnFunc(ctx, tx, requestHash)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *sql.Tx, string) *record.TokenExchange); ok {
+		r0 = returnFunc(ctx, tx, requestHash)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*record.TokenExchange)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *sql.Tx, string) error); ok {
+		r1 = returnFunc(ctx, tx, requestHash)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// Database_GetTokenExchangeByRequestHash_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetTokenExchangeByRequestHash'
+type Database_GetTokenExchangeByRequestHash_Call struct {
+	*mock.Call
+}
+
+// GetTokenExchangeByRequestHash is a helper method to define mock.On call
+//   - ctx context.Context
+//   - tx *sql.Tx
+//   - requestHash string
+func (_e *Database_Expecter) GetTokenExchangeByRequestHash(ctx any, tx any, requestHash any) *Database_GetTokenExchangeByRequestHash_Call {
+	return &Database_GetTokenExchangeByRequestHash_Call{Call: _e.mock.On("GetTokenExchangeByRequestHash", ctx, tx, requestHash)}
+}
+
+func (_c *Database_GetTokenExchangeByRequestHash_Call) Run(run func(ctx context.Context, tx *sql.Tx, requestHash string)) *Database_GetTokenExchangeByRequestHash_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 *sql.Tx
+		if args[1] != nil {
+			arg1 = args[1].(*sql.Tx)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *Database_GetTokenExchangeByRequestHash_Call) Return(exchange *record.TokenExchange, err error) *Database_GetTokenExchangeByRequestHash_Call {
+	_c.Call.Return(exchange, err)
+	return _c
+}
+
+func (_c *Database_GetTokenExchangeByRequestHash_Call) RunAndReturn(run func(context.Context, *sql.Tx, string) (*record.TokenExchange, error)) *Database_GetTokenExchangeByRequestHash_Call {
 	_c.Call.Return(run)
 	return _c
 }

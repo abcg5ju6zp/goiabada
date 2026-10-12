@@ -9,6 +9,12 @@ type WellKnownConfig struct {
 	JWKsURI                           string   `json:"jwks_uri"`
 	RegistrationEndpoint              string   `json:"registration_endpoint,omitempty"` // RFC 7591 §4
 	GrantTypesSupported               []string `json:"grant_types_supported"`
+	// TokenExchangeTokenTypesSupported publishes the RFC 8693 token type URNs the
+	// urn:ietf:params:oauth:grant-type:token-exchange grant accepts as subject and actor tokens
+	// and issues in. RFC 8693 defines no standard discovery member for them, so this server
+	// publishes them under its own member name; an exchange client reads the grant above and the
+	// URNs here.
+	TokenExchangeTokenTypesSupported []string `json:"token_exchange_token_types_supported"`
 	ResponseTypesSupported            []string `json:"response_types_supported"`
 	ResponseModesSupported            []string `json:"response_modes_supported,omitempty"` // OIDC Discovery 1.0 §3
 	PromptValuesSupported             []string `json:"prompt_values_supported,omitempty"`  // OIDC Discovery 1.0 §3

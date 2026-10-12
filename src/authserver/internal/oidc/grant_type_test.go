@@ -32,6 +32,10 @@ func TestGrantType_Traits(t *testing.T) {
 		{"client_credentials", GrantTypeClientCredentials, "client_credentials", true, true, true},
 		// Accepted at the token endpoint but never registrable: DCR has never offered it.
 		{"password", GrantTypePassword, "password", true, true, false},
+		// RFC 8693 token exchange: redeemed at the token endpoint with an optional, scope-narrowing
+		// scope parameter, and not offered by DCR.
+		{"token exchange", GrantTypeTokenExchange,
+			"urn:ietf:params:oauth:grant-type:token-exchange", true, true, false},
 		// Issued at the authorization endpoint only, so the token endpoint never redeems it.
 		{"implicit", GrantTypeImplicit, "implicit", false, false, false},
 
@@ -62,7 +66,8 @@ func TestGrantType_Traits(t *testing.T) {
 // relying party reading discovery is told the server cannot do something it does.
 func TestGrantTypesSupported(t *testing.T) {
 	assert.Equal(t,
-		[]string{"authorization_code", "refresh_token", "client_credentials", "password", "implicit"},
+		[]string{"authorization_code", "refresh_token", "client_credentials", "password",
+			"urn:ietf:params:oauth:grant-type:token-exchange", "implicit"},
 		GrantTypesSupported())
 }
 

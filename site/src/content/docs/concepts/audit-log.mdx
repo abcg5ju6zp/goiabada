@@ -105,7 +105,9 @@ An email address typed into a form nobody has signed in to is recorded only as `
 
 | Key | Meaning |
 |---|---|
+| `actor_client_id` | On a token exchange, the row id of the acting-party client the `actor_token` named; 0 when no actor token was presented. |
 | `allowed` | Whether the client may now ask for the administrative scopes. |
+| `audience` | On a token exchange, the audiences the issued token carries, as a list. |
 | `audit_log_retention_days` | The new audit log retention, in days. |
 | `audit_logs_in_console_enabled` | Whether events are now written to the console log. |
 | `audit_logs_in_database_enabled` | Whether events are now stored in the database. |
@@ -170,6 +172,7 @@ An email address typed into a form nobody has signed in to is recorded only as `
 | `scopes` | The administrative scopes a client asked for and was refused. |
 | `session_identifier` | The identifier of a user's session. |
 | `step` | The time step of an authenticator code that was sent again. |
+| `subject_user_id` | On a token exchange, the row id of the user the subject token represents. |
 | `target_id` | The row id of the user, group, client or resource a request acted on. |
 | `target_kind` | What `target_id` names: `user`, `group`, `client` or `resource`. |
 | `terminated_session_identifiers` | The identifier of each session ended. |
@@ -232,6 +235,7 @@ This is every event the auth server writes, grouped by what raises it. The viewe
 | `token_issued_client_credentials_response` | The token endpoint issued an access token to a client through the client credentials flow. |
 | `token_issued_ropc_response` | The token endpoint issued tokens for a username and password, through the password grant. |
 | `token_issued_implicit_response` | The authorization endpoint issued tokens straight to a client, through the implicit flow. |
+| `token_issued_token_exchange_response` | The token endpoint exchanged a subject token for one down-scoped access token through the RFC 8693 token exchange grant. |
 | `token_scope_denied` | The token endpoint refused a request for a scope the client or user may not have, or an OpenID Connect scope on the client credentials grant, or a client credentials request that left `scope` out from a client holding no permissions, recorded with an empty `scope`. |
 | `ropc_auth_failed` | The token endpoint refused a password grant, because the email or password was wrong, or the user was disabled or has two-factor authentication on. |
 | `auth_code_reuse_detected` | A client redeemed an authorization code a second time. The refresh tokens issued through that code's session were revoked, and, if there were any, the session ended. |

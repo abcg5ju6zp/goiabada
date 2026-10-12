@@ -21,6 +21,7 @@ var aesProtectedColumns = []struct{ table, column string }{
 	{"users", "forgot_password_code_encrypted"},
 	{"users", "otp_enrollment_secret_encrypted"},
 	{"pre_registrations", "verification_code_encrypted"},
+	{"token_exchanges", "issued_token_encrypted"},
 }
 
 // ReencryptToKey re-encrypts every secret stored at rest from oldKey to newKey and re-encrypts

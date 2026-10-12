@@ -5,6 +5,7 @@ import (
 	"database/sql"
 
 	"github.com/leodip/goiabada/authserver/internal/encryption"
+	"github.com/leodip/goiabada/authserver/internal/permissions"
 	"github.com/leodip/goiabada/authserver/internal/record"
 )
 
@@ -15,21 +16,32 @@ import (
 // that go into the tokens, and, for the implicit grant, the session row it takes and the
 // transaction it takes it in.
 type tokenIssuerDatabase interface {
+	permissions.ScopeResolverDatabase
+
+	AcquireClientRow(ctx context.Context, tx *sql.Tx, clientId int64) error
 	AcquireUserRow(ctx context.Context, tx *sql.Tx, userId int64) error
 	AcquireUserSessionRow(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (bool, error)
+	ClientLoadPermissions(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	CodeLoadClient(ctx context.Context, tx *sql.Tx, code *record.Code) error
 	CodeLoadUser(ctx context.Context, tx *sql.Tx, code *record.Code) error
 	CreateRefreshToken(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error
+	CreateTokenExchange(ctx context.Context, tx *sql.Tx, exchange *record.TokenExchange) error
+	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
 	GetCurrentSigningKey(ctx context.Context, tx *sql.Tx) (*record.KeyPair, error)
 	GetRefreshTokenById(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (*record.RefreshToken, error)
+	GetRefreshTokenByJti(ctx context.Context, tx *sql.Tx, jti string) (*record.RefreshToken, error)
+	GetTokenExchangeByIssuedJti(ctx context.Context, tx *sql.Tx, exchangeJti string) (*record.TokenExchange, error)
+	GetTokenExchangeByRequestHash(ctx context.Context, tx *sql.Tx, requestHash string) (*record.TokenExchange, error)
 	GetUserById(ctx context.Context, tx *sql.Tx, userId int64) (*record.User, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
 	GroupsLoadAttributes(ctx context.Context, tx *sql.Tx, groups []record.Group) error
 	IsRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (bool, error)
 	MarkCodeAsUsed(ctx context.Context, tx *sql.Tx, codeId int64) (bool, error)
 	MarkRefreshTokenAsRevoked(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (bool, error)
+	PermissionsLoadResources(ctx context.Context, tx *sql.Tx, permissions []record.Permission) error
 	RecordRefreshTokenFamilyRevoked(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string, reason string) (bool, error)
 	RefreshTokenLoadClient(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error
+	RefreshTokenLoadCode(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error
 	RefreshTokenLoadUser(ctx context.Context, tx *sql.Tx, refreshToken *record.RefreshToken) error
 	RevokeRefreshTokenFamily(ctx context.Context, tx *sql.Tx, firstRefreshTokenJti string) (int64, error)
 	RunInTransaction(ctx context.Context, fn func(tx *sql.Tx) error) error

@@ -8,4 +8,7 @@ type TokenResponse struct {
 	RefreshToken     string `json:"refresh_token,omitempty"`
 	RefreshExpiresIn int64  `json:"refresh_expires_in,omitempty"`
 	Scope            string `json:"scope,omitempty"`
+	// IssuedTokenType is the RFC 8693 section 2.2.1 issued_token_type a token exchange response
+	// carries. Empty on every other grant, which omits the member.
+	IssuedTokenType string `json:"issued_token_type,omitempty"`
 }

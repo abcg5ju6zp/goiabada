@@ -27,7 +27,9 @@ func expectedDiscoveryDocument() oidc.WellKnownConfig {
 		EndSessionEndpoint:    testBaseURL + "/auth/logout",
 		JWKsURI:               testBaseURL + "/certs",
 		// Every grant the server implements, in the grant table's order (#437).
-		GrantTypesSupported:              []string{"authorization_code", "refresh_token", "client_credentials", "password", "implicit"},
+		GrantTypesSupported: []string{"authorization_code", "refresh_token", "client_credentials", "password",
+			"urn:ietf:params:oauth:grant-type:token-exchange", "implicit"},
+		TokenExchangeTokenTypesSupported: oidc.TokenExchangeTokenTypesSupported(),
 		ResponseTypesSupported:           []string{"code", "token", "id_token", "id_token token"},
 		ResponseModesSupported:           []string{"query", "fragment", "form_post"},
 		PromptValuesSupported:            []string{"none", "login", "consent"},
@@ -37,7 +39,7 @@ func expectedDiscoveryDocument() oidc.WellKnownConfig {
 		// The roster is pinned literally in oidc_test.go; this asserts discovery publishes that one list.
 		ScopesSupported: oidc.SupportedScopes(),
 		ClaimsSupported: []string{
-			"iss", "iat", "nbf", "auth_time", "jti", "acr", "amr", "sid", "aud", "typ", "exp", "nonce", "auth_state_generation",
+			"iss", "iat", "nbf", "auth_time", "jti", "acr", "amr", "sid", "aud", "typ", "exp", "nonce", "auth_state_generation", "act",
 			"sub", "name", "given_name", "middle_name", "family_name", "nickname", "preferred_username",
 			"profile", "picture", "website", "gender", "birthdate", "zoneinfo", "locale", "updated_at",
 			"email", "email_verified", "address", "phone_number", "phone_number_verified",

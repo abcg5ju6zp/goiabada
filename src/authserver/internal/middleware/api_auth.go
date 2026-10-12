@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
@@ -117,10 +118,16 @@ func (m *BearerToken) RequireUserBoundToken() func(http.Handler) http.Handler {
 }
 
 // apiAuthDatabase is what the API session check needs: the bearer's user row and the session the
-// token names.
+// token names, and for a token issued by RFC 8693 token exchange the recorded lineage its act
+// claim points at, so a disabled client or a revoked source grant invalidates a derived token
+// through the same guard that enforces sessions and generations.
 type apiAuthDatabase interface {
 	GetUserBySubject(ctx context.Context, tx *sql.Tx, subject string) (*record.User, error)
 	GetUserSessionBySessionIdentifier(ctx context.Context, tx *sql.Tx, sessionIdentifier string) (*record.UserSession, error)
+	GetTokenExchangeByIssuedJti(ctx context.Context, tx *sql.Tx, exchangeJti string) (*record.TokenExchange, error)
+	GetClientById(ctx context.Context, tx *sql.Tx, clientId int64) (*record.Client, error)
+	GetRefreshTokenById(ctx context.Context, tx *sql.Tx, refreshTokenId int64) (*record.RefreshToken, error)
+	GetCodeById(ctx context.Context, tx *sql.Tx, codeId int64) (*record.Code, error)
 }
 
 // RequireValidSession rejects bearer tokens that no longer represent live, current
@@ -219,6 +226,9 @@ func (m *BearerToken) RequireValidSession(database apiAuthDatabase) func(http.Ha
 					m.refusals.invalidToken(w, r, "Session has been terminated")
 					return
 				}
+				if !m.enforceExchangeLineage(w, r, database, jwtToken, user.Id) {
+					return
+				}
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -282,9 +292,114 @@ func (m *BearerToken) RequireValidSession(database apiAuthDatabase) func(http.Ha
 				return
 			}
 
+			// A token minted by token exchange additionally answers for its recorded lineage: the
+			// client that requested every hop must still be enabled and its source grant unrevoked.
+			if !m.enforceExchangeLineage(w, r, database, jwtToken, user.Id) {
+				return
+			}
+
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// enforceExchangeLineage enforces the revocation lineage RFC 8693 exchanges record. A token
+// without an act claim is not an exchanged token and passes untouched. For one that is, every
+// token_exchanges row on its chain must exist, name the token's user and have an enabled
+// requesting (and, when named, acting) client, and its source refresh token or code, when it has
+// one, must not be revoked. Session termination, expiry and generation advancement are already
+// enforced from the inherited sid and auth_state_generation claims; this is the half those claims
+// cannot express. A missing row fails closed: a token that claims a lineage nothing records is
+// refused whatever the row's absence means.
+func (m *BearerToken) enforceExchangeLineage(w http.ResponseWriter, r *http.Request,
+	database apiAuthDatabase, jwtToken oauth.JwtToken, userId int64) bool {
+
+	if _, hasAct := jwtToken.Claims["act"]; !hasAct {
+		return true
+	}
+
+	currentJti := jwtToken.StringClaim("jti")
+	if currentJti == "" {
+		slog.WarnContext(r.Context(), "rejecting bearer token: exchanged token has no jti")
+		m.refusals.invalidToken(w, r, invalidTokenDescription)
+		return false
+	}
+
+	for range oidc.MaxActorChainDepth + 1 {
+		row, err := database.GetTokenExchangeByIssuedJti(r.Context(), nil, currentJti)
+		if err != nil {
+			m.refusals.internalError(w, r,
+				errs.Wrap(err, "failed to look up token exchange lineage for bearer token"), currentJti)
+			return false
+		}
+		if row == nil || !row.SubjectUserId.Valid || row.SubjectUserId.Int64 != userId {
+			slog.WarnContext(r.Context(), "rejecting bearer token: its token exchange lineage is missing or belongs to another user",
+				"exchange_jti", currentJti)
+			m.refusals.invalidToken(w, r, "Session has been terminated")
+			return false
+		}
+
+		clientIds := []int64{row.ClientId}
+		if row.ActorClientId.Valid && row.ActorClientId.Int64 != row.ClientId {
+			clientIds = append(clientIds, row.ActorClientId.Int64)
+		}
+		for _, clientId := range clientIds {
+			client, err := database.GetClientById(r.Context(), nil, clientId)
+			if err != nil {
+				m.refusals.internalError(w, r,
+					errs.Wrap(err, "failed to look up the token exchange client"), currentJti)
+				return false
+			}
+			if client == nil || !client.Enabled {
+				slog.WarnContext(r.Context(), "rejecting bearer token: a client in its token exchange lineage is disabled",
+					"exchange_jti", currentJti, "client_id", clientId)
+				m.refusals.invalidToken(w, r, "Session has been terminated")
+				return false
+			}
+		}
+
+		if row.SourceRefreshTokenId.Valid {
+			sourceRefresh, err := database.GetRefreshTokenById(r.Context(), nil, row.SourceRefreshTokenId.Int64)
+			if err != nil {
+				m.refusals.internalError(w, r,
+					errs.Wrap(err, "failed to look up the source refresh token"), currentJti)
+				return false
+			}
+			if sourceRefresh == nil || sourceRefresh.Revoked {
+				slog.WarnContext(r.Context(), "rejecting bearer token: its source refresh token was revoked",
+					"exchange_jti", currentJti)
+				m.refusals.invalidToken(w, r, "Session has been terminated")
+				return false
+			}
+		}
+		if row.SourceCodeId.Valid {
+			sourceCode, err := database.GetCodeById(r.Context(), nil, row.SourceCodeId.Int64)
+			if err != nil {
+				m.refusals.internalError(w, r,
+					errs.Wrap(err, "failed to look up the source code"), currentJti)
+				return false
+			}
+			if sourceCode == nil || sourceCode.Revoked {
+				slog.WarnContext(r.Context(), "rejecting bearer token: its source grant was revoked",
+					"exchange_jti", currentJti)
+				m.refusals.invalidToken(w, r, "Session has been terminated")
+				return false
+			}
+		}
+
+		// Follow the chain toward the original grant; a jti no exchange row records ends it.
+		nextJti := row.SubjectTokenJti
+		if nextJti == "" || nextJti == currentJti {
+			return true
+		}
+		currentJti = nextJti
+	}
+
+	// The walk exceeded the maximum chain length without reaching an original grant: refuse
+	// rather than loop on a chain nobody should be able to sign.
+	slog.WarnContext(r.Context(), "rejecting bearer token: its token exchange chain is too deep", "exchange_jti", jwtToken.StringClaim("jti"))
+	m.refusals.invalidToken(w, r, "Session has been terminated")
+	return false
 }
 
 // tokenGeneration reads a token's authentication generation, reporting validity as a second

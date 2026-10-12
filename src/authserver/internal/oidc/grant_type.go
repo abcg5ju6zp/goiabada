@@ -49,6 +49,10 @@ var grantTable = []grantTraits{
 	{GrantTypeRefreshToken, true, true, true},
 	{GrantTypeClientCredentials, true, true, true},
 	{GrantTypePassword, true, true, false},
+	// RFC 8693 token exchange, redeemed at the token endpoint. Its scope parameter is optional and
+	// narrows the subject's grant, but when present it is space-delimited like every other grant's,
+	// so it reads scope and the entry-point grammar check applies. DCR has never offered it.
+	{GrantTypeTokenExchange, true, true, false},
 	{GrantTypeImplicit, false, false, false},
 }
 
