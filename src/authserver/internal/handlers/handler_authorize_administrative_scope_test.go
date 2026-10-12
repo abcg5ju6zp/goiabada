@@ -196,6 +196,7 @@ func TestHandleAuthorizeGet_AnAllowedClientIsNotRefusedAnAdministrativeScope(t *
 			authorizeValidator.On("ValidateRequest", mock.Anything).Return(nil)
 			authorizeValidator.On("ValidateScopes", mock.Anything, "openid authserver:manage").Return(nil)
 			authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+			authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 			stubRegisteredRedirectURI(database, "https://legit.example/cb")
 			database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.Anything).
 				Return(nil, nil)

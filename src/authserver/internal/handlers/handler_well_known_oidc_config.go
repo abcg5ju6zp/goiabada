@@ -6,6 +6,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/internal/richauth"
 )
 
 // HandleWellKnownOIDCConfigGet serves the discovery document. It describes what the server
@@ -51,7 +52,10 @@ func HandleWellKnownOIDCConfigGet(
 				"phone_number", "phone_number_verified", // phone
 				"groups",     // groups
 				"attributes", // attributes
+				richauth.ParameterName, // RFC 9396 access token claim
 			},
+			// RFC 9396: the detail types an authorization request may carry.
+			AuthorizationDetailsTypesSupported: richauth.SupportedTypes(),
 			// none is a public client, which authenticates with its client_id alone (RFC 7591
 			// section 2) and which DCR registers.
 			TokenEndpointAuthMethodsSupported: []string{"client_secret_post", "client_secret_basic", "none"},

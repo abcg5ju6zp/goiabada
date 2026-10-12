@@ -95,6 +95,7 @@ func TestHandlePromptNone_StepUpAnswers(t *testing.T) {
 			authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
 			authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 			authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
+			authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 
 			client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: tc.target}
 			database.On("GetClientByClientIdentifier", mock.Anything, mock.Anything, "test-client").Return(client, nil)
@@ -174,6 +175,7 @@ func TestHandlePromptNone_LoadFaultsAnswer500(t *testing.T) {
 			authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
 			authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 			authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
+			authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 
 			// ConsentRequired, so the consent is read and every load is reached.
 			client := &record.Client{Id: 1, ClientIdentifier: "test-client", DefaultAcrLevel: record.AcrLevel1, ConsentRequired: true}
@@ -304,6 +306,7 @@ func TestHandlePromptNone_ManageAccountConsent(t *testing.T) {
 			authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
 			authorizeValidator.On("ValidateScopes", mock.Anything, scope).Return(nil)
 			authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
+			authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 
 			// Consent required off, as every client an administrator creates starts.
 			client := &record.Client{Id: 1, ClientIdentifier: tc.clientIdentifier, DefaultAcrLevel: record.AcrLevel1}

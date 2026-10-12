@@ -104,8 +104,8 @@ func parityAllowlist() []parityRule {
 				"so a width there would be documentation the engine ignores. The other three " +
 				"enforce theirs, which is why this is recorded as a difference rather than " +
 				"folded onto unbounded: SQLite really does store a value SQL Server would refuse.",
-			Count:  96,
-			Digest: "78b8ba05a3603ea1",
+			Count:  97,
+			Digest: "0a95b4d81cf289f0",
 			Excuses: func(d parityDivergence) bool {
 				return d.Axis == parityAxisType && oddOneOut(d, data.SQLite) &&
 					d.Says[data.SQLite] == "string(no declared length)" &&
@@ -234,6 +234,21 @@ func parityAllowlist() []parityRule {
 			Excuses: func(d parityDivergence) bool {
 				return d.Axis == parityAxisDefault && oddOneOut(d, data.MySQL) &&
 					d.Table == "audit_logs" && d.Object == "details" &&
+					strings.Contains(d.Says[data.MySQL], "_utf8mb4")
+			},
+		},
+		{
+			Name: "mysql: codes.authorization_details records its expression default with a charset introducer",
+			Why: "Same idiom as audit_logs.details: the LONGTEXT default is written as an " +
+				"expression ('[]') because MySQL refuses a literal default on LONGTEXT, and " +
+				"the catalog records the charset introducer (_utf8mb4'[]') where the other " +
+				"three engines read '[]'. Every code insert supplies the value, so the " +
+				"default only backfills existing rows.",
+			Count:  1,
+			Digest: "4a8eeaa859d01c2d",
+			Excuses: func(d parityDivergence) bool {
+				return d.Axis == parityAxisDefault && oddOneOut(d, data.MySQL) &&
+					d.Table == "codes" && d.Object == "authorization_details" &&
 					strings.Contains(d.Says[data.MySQL], "_utf8mb4")
 			},
 		},

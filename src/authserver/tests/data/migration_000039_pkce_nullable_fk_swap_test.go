@@ -364,15 +364,16 @@ func TestMigration000039_RopcTokenBlocksUserDelete(t *testing.T) {
 
 // --- seeding -------------------------------------------------------------------------
 //
-// Through the repository's own CRUD rather than raw SQL, unlike the older migration tests
-// here: the point of the row-value case is that every column arrives where the Go model
-// says it should, and hand-written INSERTs per dialect would be asserting the test's own
-// column list rather than the migration's.
-//
-// The client is the exception. 000039 rebuilds codes and refresh_tokens, not clients, and only
-// the client's id is read here; the record names columns later migrations add to clients,
-// administrative_scopes_allowed (000060) among them, so the ORM's insert no longer fits the
-// schema before 000039.
+// Through version-pinned column lists rather than the repository's head-struct CRUD:
+// record.Code and record.RefreshToken follow the head schema, and a column added by any
+// later migration makes the ORM insert or select name a column an older catalog does not
+// have. 000063 adds codes.authorization_details, which is what put codes onto the same
+// carve-out the client already had here (the record names administrative_scopes_allowed
+// from 000060, which is why seedClient000039 is raw SQL); refresh_tokens has used an
+// explicit list since this test was written (#125). The point the row-value case still
+// makes is then made by hand: every column arrives where the migration's own column list
+// says it should, and the reads scan the same list, so a copy that crossed two of them is
+// visible in the comparison.
 
 func seedClient000039(t *testing.T, h *isolatedDB) *record.Client {
 	t.Helper()
@@ -393,6 +394,63 @@ func seedUser000039(t *testing.T, h *isolatedDB) *record.User {
 	return user
 }
 
+// codeColumns000039 are the codes columns as 000039 leaves them, and the order
+// seedCode000039 writes them in. Read back through codeScanColumns000039. Named here
+// rather than taken from record.Code, which follows the head schema: through the data
+// layer this test would name authorization_details, which 000063 adds, against a table
+// that does not have it yet. The set is identical on all four engines at their
+// respective predecessors (postgres 000035, sqlite 000036, mysql 000037, mssql
+// 000038): none of the engine-specific 000036 to 000038 files adds or drops a codes
+// column, and 000039 only changes nullability and types.
+var codeColumns000039 = []string{
+	"created_at", "updated_at", "code_hash", "client_id", "code_challenge",
+	"code_challenge_method", "scope", "state", "nonce", "redirect_uri", "user_id",
+	"ip_address", "user_agent", "response_mode", "authenticated_at", "session_identifier",
+	"acr_level", "auth_methods", "used", "auth_state_generation", "revoked",
+}
+
+// codeScanColumns000039 is codeColumns000039 with the primary key first, the order
+// codeScanFields000039 scans in.
+var codeScanColumns000039 = append([]string{"id"}, codeColumns000039...)
+
+// codeFieldValues000039 are code's writable fields in codeColumns000039's order, as
+// insert values.
+func codeFieldValues000039(code *record.Code) []any {
+	return []any{
+		code.CreatedAt, code.UpdatedAt, code.CodeHash, code.ClientId, code.CodeChallenge,
+		code.CodeChallengeMethod, code.Scope, code.State, code.Nonce, code.RedirectURI,
+		code.UserId, code.IpAddress, code.UserAgent, code.ResponseMode, code.AuthenticatedAt,
+		code.SessionIdentifier, code.AcrLevel, code.AuthMethods, code.Used,
+		code.AuthStateGeneration, code.Revoked,
+	}
+}
+
+// codeScanFields000039 are code's fields in codeScanColumns000039's order, as scan
+// targets.
+func codeScanFields000039(code *record.Code) []any {
+	return []any{
+		&code.Id, &code.CreatedAt, &code.UpdatedAt, &code.CodeHash, &code.ClientId,
+		&code.CodeChallenge, &code.CodeChallengeMethod, &code.Scope, &code.State,
+		&code.Nonce, &code.RedirectURI, &code.UserId, &code.IpAddress, &code.UserAgent,
+		&code.ResponseMode, &code.AuthenticatedAt, &code.SessionIdentifier, &code.AcrLevel,
+		&code.AuthMethods, &code.Used, &code.AuthStateGeneration, &code.Revoked,
+	}
+}
+
+// insertCodeRow000039 inserts one codes row over codeColumns000039. A challenge-less
+// code binds sql.NullString{Valid:false}, a real NULL, so on pre-000039 SQLite this is
+// refused exactly the way the ORM insert used to be, which is the defect the
+// challengeless case asserts. It returns the raw insert error rather than requiring
+// success, because that refusal is itself an assertion.
+func insertCodeRow000039(t *testing.T, h *isolatedDB, code *record.Code) error {
+	t.Helper()
+	insert := sqlbuilder.NewInsertBuilder()
+	insert.InsertInto("codes").Cols(codeColumns000039...).Values(codeFieldValues000039(code)...)
+	q, args := insert.BuildWithFlavor(flavor000039())
+	_, err := h.SQL.ExecContext(context.Background(), q, args...)
+	return err
+}
+
 // seedCode000039 gives every column its own recognisable value, so a copy that crossed two
 // of them is visible in the comparison rather than hidden behind two equal defaults.
 func seedCode000039(t *testing.T, h *isolatedDB, client *record.Client, user *record.User,
@@ -401,6 +459,8 @@ func seedCode000039(t *testing.T, h *isolatedDB, client *record.Client, user *re
 
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	code := &record.Code{
+		CreatedAt:            sql.NullTime{Time: now, Valid: true},
+		UpdatedAt:           sql.NullTime{Time: now, Valid: true},
 		CodeHash:            "hash-" + fake.UUID(),
 		ClientId:            client.Id,
 		UserId:              user.Id,
@@ -421,7 +481,13 @@ func seedCode000039(t *testing.T, h *isolatedDB, client *record.Client, user *re
 		Revoked:             true,
 		AuthStateGeneration: 7,
 	}
-	require.NoError(t, h.DB.CreateCode(context.Background(), nil, code), "seed code")
+	require.NoError(t, insertCodeRow000039(t, h, code), "seed code")
+
+	lookup := sqlbuilder.NewSelectBuilder()
+	lookup.Select("id").From("codes").Where(lookup.Equal("code_hash", code.CodeHash))
+	q, args := lookup.BuildWithFlavor(flavor000039())
+	require.NoError(t, h.SQL.QueryRowContext(context.Background(), q, args...).Scan(&code.Id),
+		"read back the seeded code's id")
 	return code
 }
 
@@ -503,12 +569,16 @@ func seedRefreshToken000039(t *testing.T, h *isolatedDB, shape record.RefreshTok
 // createChallengelessCode000039 builds exactly what CodeIssuer.IssueAuthCode builds when
 // the authorization request carried no challenge: both NullStrings at their zero value,
 // which is Valid:false. It returns the error rather than requiring success, because being
-// refused is the assertion on one side of this migration.
+// refused is the assertion on one side of this migration. On success the row's id is read
+// back into code, so out identifies what the later rollback assertions read.
 func createChallengelessCode000039(t *testing.T, h *isolatedDB, client *record.Client,
 	user *record.User, out *record.Code) error {
 	t.Helper()
 
+	now := time.Now().UTC().Truncate(time.Microsecond)
 	code := &record.Code{
+		CreatedAt:           sql.NullTime{Time: now, Valid: true},
+		UpdatedAt:          sql.NullTime{Time: now, Valid: true},
 		CodeHash:            "hash-" + fake.UUID(),
 		ClientId:            client.Id,
 		UserId:              user.Id,
@@ -517,23 +587,37 @@ func createChallengelessCode000039(t *testing.T, h *isolatedDB, client *record.C
 		Scope:               "openid",
 		RedirectURI:         "https://example.com/cb",
 		ResponseMode:        "query",
-		AuthenticatedAt:     time.Now().UTC().Truncate(time.Microsecond),
+		AuthenticatedAt:     now,
 		SessionIdentifier:   fake.UUID(),
 		AcrLevel:            "urn:goiabada:level1",
 		AuthMethods:         "pwd",
 	}
-	err := h.DB.CreateCode(context.Background(), nil, code)
-	if err == nil && out != nil {
-		*out = *code
+	err := insertCodeRow000039(t, h, code)
+	if err == nil {
+		lookup := sqlbuilder.NewSelectBuilder()
+		lookup.Select("id").From("codes").Where(lookup.Equal("code_hash", code.CodeHash))
+		q, args := lookup.BuildWithFlavor(flavor000039())
+		if lookupErr := h.SQL.QueryRowContext(context.Background(), q, args...).Scan(&code.Id); lookupErr != nil {
+			return lookupErr
+		}
+		if out != nil {
+			*out = *code
+		}
 	}
 	return err
 }
 
+// readCode000039 scans the version-pinned codeScanColumns000039 list rather than the head
+// record, so it reads codes rows at 000039 and its predecessors where columns later
+// migrations add (authorization_details at 000063 among them) do not exist.
 func readCode000039(t *testing.T, h *isolatedDB, id int64) *record.Code {
 	t.Helper()
-	code, err := h.DB.GetCodeById(context.Background(), nil, id)
-	require.NoErrorf(t, err, "read code %d back", id)
-	require.NotNilf(t, code, "code %d is gone", id)
+	code := &record.Code{}
+	read := sqlbuilder.NewSelectBuilder()
+	read.Select(codeScanColumns000039...).From("codes").Where(read.Equal("id", id))
+	q, args := read.BuildWithFlavor(flavor000039())
+	require.NoErrorf(t, h.SQL.QueryRowContext(context.Background(), q, args...).Scan(codeScanFields000039(code)...),
+		"read code %d back", id)
 	return code
 }
 

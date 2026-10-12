@@ -10,6 +10,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/richauth"
 	"github.com/leodip/goiabada/authserver/internal/useragent"
 	"github.com/leodip/goiabada/authserver/internal/uuid"
 	"github.com/leodip/goiabada/core/errs"
@@ -81,6 +82,9 @@ type CreateCodeInput struct {
 	// OTPClaim is the code's claim to a one-time code, checked on the user under the user's row lock
 	// before the code is written (#542).
 	OTPClaim otpcredential.OTPClaim
+	// AuthorizationDetails is the consent-approved RFC 9396 snapshot, canonical and
+	// already filtered against the user's current grants. Empty for a scope-only code.
+	AuthorizationDetails []richauth.Detail
 }
 
 func NewCodeIssuer(database codeIssuerDatabase) *CodeIssuer {
@@ -255,6 +259,10 @@ func (ci *CodeIssuer) createAuthCode(ctx context.Context, tx *sql.Tx, input *Cre
 		// Redemption compares it against the user's current value, so a code issued by a
 		// ceremony that straddled a credential change is rejected (#106 decision 11).
 		AuthStateGeneration: input.AuthStateGeneration,
+		// The approved snapshot as canonical JSON, "[]" for a scope-only code, so the
+		// NOT NULL column never stores anything that is not a JSON array and redemption
+		// can parse it unconditionally.
+		AuthorizationDetails: richauth.CanonicalJSON(input.AuthorizationDetails),
 	}
 
 	err = ci.database.CreateCode(ctx, tx, code)

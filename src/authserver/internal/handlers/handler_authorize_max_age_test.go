@@ -153,6 +153,7 @@ func TestHandleAuthorizeGet_MaxAge(t *testing.T) {
 		})).Return(nil)
 		f.authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		f.authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
+		f.authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 
 		userSession := &record.UserSession{Id: 7, UserId: 1, AcrLevel: record.AcrLevel1,
 			User: record.User{Id: 1, Enabled: true}}

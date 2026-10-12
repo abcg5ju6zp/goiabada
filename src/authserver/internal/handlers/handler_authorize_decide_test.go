@@ -15,6 +15,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/richauth"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -376,6 +377,8 @@ func TestValidateAuthorizeRequest(t *testing.T) {
 				Run(recordCall("ValidateScopes")).Return(tc.scopesErr).Maybe()
 			authorizeValidator.On("ValidatePrompt", "login").
 				Run(recordCall("ValidatePrompt")).Return("login", nil).Maybe()
+			authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).
+				Return(nil, nil).Maybe()
 			tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "not-a-token", false).
 				Run(recordCall("DecodeAndValidateTokenString")).Return(nil, errors.New("malformed")).Maybe()
 
@@ -440,6 +443,10 @@ type silentWorld struct {
 	consentRequired    bool
 	clientIdentifier   string
 	consentScope       *string // nil for no consent row
+	// detailsRequested marks an RFC 9396 request; effectiveDetails is what the user
+	// currently holds.
+	detailsRequested bool
+	effectiveDetails []richauth.Detail
 }
 
 // driveSilentAuthentication runs decideSilentAuthentication as handlePromptNone does, loading each
@@ -448,11 +455,12 @@ func driveSilentAuthentication(t *testing.T, world silentWorld) (silentAuthentic
 	t.Helper()
 
 	facts := silentAuthenticationFacts{
-		maxAgeRequested:  world.maxAgeRequested,
-		hintSubject:      world.hint,
-		target:           world.target,
-		consentRequired:  world.consentRequired,
-		clientIdentifier: world.clientIdentifier,
+		maxAgeRequested:   world.maxAgeRequested,
+		hintSubject:       world.hint,
+		target:            world.target,
+		consentRequired:   world.consentRequired,
+		clientIdentifier:  world.clientIdentifier,
+		detailsRequested:  world.detailsRequested,
 	}
 	var asked []silentFact
 	for {
@@ -489,6 +497,9 @@ func driveSilentAuthentication(t *testing.T, world silentWorld) (silentAuthentic
 		case silentFactEffectiveScope:
 			scope := world.effectiveScope
 			facts.effectiveScope = &scope
+		case silentFactEffectiveDetails:
+			details := world.effectiveDetails
+			facts.effectiveDetails = &details
 		case silentFactConsent:
 			facts.consentLoaded = true
 			if world.consentScope != nil {
@@ -680,6 +691,28 @@ func TestDecideSilentAuthentication(t *testing.T) {
 			name:      "no consent asked for when the client does not require it and offline_access is absent",
 			world:     passing,
 			wantReads: []silentFact{session, validity, scope},
+		},
+		{
+			// RFC 9396: rich authorization requests can never be silent; even a full
+			// stored scope consent does not cover item-level approval.
+			name: "authorization_details the user holds require interactive consent",
+			world: with(func(w *silentWorld) {
+				w.detailsRequested = true
+				w.effectiveDetails = []richauth.Detail{{Resource: "billing", Actions: []string{"read"}}}
+			}),
+			wantCode:        oidc.ErrorConsentRequired,
+			wantDescription: "User consent is required for the requested authorization details",
+			wantReads:       []silentFact{session, validity, scope, silentFactEffectiveDetails},
+		},
+		{
+			name: "authorization_details the user holds none of are an access denial",
+			world: with(func(w *silentWorld) {
+				w.detailsRequested = true
+				w.effectiveDetails = nil
+			}),
+			wantCode:        "access_denied",
+			wantDescription: "The user is not authorized for any of the requested authorization details",
+			wantReads:       []silentFact{session, validity, scope, silentFactEffectiveDetails},
 		},
 		{
 			name:            "a client requiring consent with none given",

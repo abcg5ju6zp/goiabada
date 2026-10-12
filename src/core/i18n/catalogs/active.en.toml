@@ -94,6 +94,9 @@
 "consent.scope.offline_access.description" = "Access to an offline refresh token, allowing the client to obtain a new access token without requiring your immediate interaction"
 "consent.scope.permission_template" = "Permission {{.permission}} on resource {{.resource}}"
 "consent.scope.authserver_manage_account.description" = "Manage your account for you: change your profile, phone, address and picture, see and sign out your sessions, and withdraw consents you have given. Changing your email, password or two-factor authentication still needs your password."
+"consent.details.heading" = "Requested resource permissions"
+"consent.details.intro" = "The client also requested these specific permissions, expressed as authorization details:"
+"consent.details.permission_template" = "Permissions {{.actions}} on resource {{.resource}}"
 
 # --- Logout confirmation (auth/logout) --------------------------------------
 

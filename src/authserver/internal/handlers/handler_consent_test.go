@@ -17,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/data/mocks"
 	"github.com/leodip/goiabada/authserver/internal/handlers/mocks"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/richauth"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
 	"github.com/stretchr/testify/assert"
@@ -39,6 +40,10 @@ var consentSaveTx = &sql.Tx{}
 func stubUserHoldsEveryScope(permissionChecker *handlersmocks.PermissionChecker) {
 	permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, mock.Anything, mock.Anything).
 		Return(func(_ context.Context, scope string, user *record.User) string { return scope }, nil)
+	// Scope-only cases hand no details; the stub still has to answer the live detail
+	// filter the held-fact loader calls on every approval, returning the selection.
+	permissionChecker.On("FilterAuthorizationDetails", mock.Anything, mock.Anything, mock.Anything).
+		Return(func(_ context.Context, details []richauth.Detail, user *record.User) []richauth.Detail { return details }, nil)
 }
 
 func TestBuildScopeInfoArray(t *testing.T) {
@@ -1020,6 +1025,8 @@ func TestHandleConsentPost(t *testing.T) {
 		// filters something other than the selection fails here rather than passing.
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized",
 			mock.Anything, "openid backend:read backend:write", user).Return("openid backend:read", nil)
+		permissionChecker.On("FilterAuthorizationDetails", mock.Anything, mock.Anything, mock.Anything).
+			Return(nil, nil)
 
 		datamocks.ExpectRunInTransaction(database, consentSaveTx)
 		database.On("GetConsentByUserIdAndClientId", mock.Anything, consentSaveTx, int64(1), int64(1)).Return(nil, nil)
@@ -1104,6 +1111,8 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "openid backend:read", user).
 			Return("", errors.New("permission filter sentinel"))
+		permissionChecker.On("FilterAuthorizationDetails", mock.Anything, mock.Anything, mock.Anything).Maybe().
+			Return(nil, nil)
 
 		pageRenderer.On("InternalServerError", rr, req, mock.MatchedBy(func(err error) bool {
 			return err != nil && strings.Contains(err.Error(), "permission filter sentinel")
@@ -1163,6 +1172,8 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "backend:read", user).
 			Return("", nil)
+		permissionChecker.On("FilterAuthorizationDetails", mock.Anything, mock.Anything, mock.Anything).
+			Return(nil, nil)
 
 		// The clear has to land on the wire before the redirect commits, so the sentinel is the
 		// same one the two older refusals use (#141).
@@ -1238,6 +1249,8 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "backend:read", user).
 			Return("", nil)
+		permissionChecker.On("FilterAuthorizationDetails", mock.Anything, mock.Anything, mock.Anything).
+			Return(nil, nil)
 
 		// A failed clear writes no cookie, so the browser keeps the auth context whatever happens
 		// next. The client is still owed its error response, and server_error is what RFC 6749
@@ -1311,6 +1324,8 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "backend:read", user).
 			Return("", nil)
+		permissionChecker.On("FilterAuthorizationDetails", mock.Anything, mock.Anything, mock.Anything).
+			Return(nil, nil)
 
 		ceremonyStore.On("ClearAuthContext", rr, req).
 			Return(errors.New("the session store is unreachable"))
@@ -1375,6 +1390,8 @@ func TestHandleConsentPost(t *testing.T) {
 
 		permissionChecker.On("FilterOutScopesWhereUserIsNotAuthorized", mock.Anything, "backend:read", user).
 			Return("", nil)
+		permissionChecker.On("FilterAuthorizationDetails", mock.Anything, mock.Anything, mock.Anything).
+			Return(nil, nil)
 
 		// The other half of the same family: here the clear succeeds and it is the ordinary
 		// access_denied refusal that cannot be committed. This is the site's second and separate

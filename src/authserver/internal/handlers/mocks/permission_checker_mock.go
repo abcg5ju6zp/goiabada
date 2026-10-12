@@ -13,6 +13,7 @@ import (
 	"context"
 
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/richauth"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -119,7 +120,81 @@ func (_c *PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call) Return
 	return _c
 }
 
-func (_c *PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call) RunAndReturn(run func(ctx context.Context, scope string, user *record.User) (string, error)) *PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call {
+func (_c *PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call) RunAndReturn(run func(context.Context, string, *record.User) (string, error)) *PermissionChecker_FilterOutScopesWhereUserIsNotAuthorized_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// FilterAuthorizationDetails provides a mock function for the type PermissionChecker
+func (_mock *PermissionChecker) FilterAuthorizationDetails(ctx context.Context, details []richauth.Detail, user *record.User) ([]richauth.Detail, error) {
+	ret := _mock.Called(ctx, details, user)
+
+	if len(ret) == 0 {
+		panic("no return value specified for FilterAuthorizationDetails")
+	}
+
+	var r0 []richauth.Detail
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []richauth.Detail, *record.User) ([]richauth.Detail, error)); ok {
+		return returnFunc(ctx, details, user)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, []richauth.Detail, *record.User) []richauth.Detail); ok {
+		r0 = returnFunc(ctx, details, user)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]richauth.Detail)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, []richauth.Detail, *record.User) error); ok {
+		r1 = returnFunc(ctx, details, user)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// PermissionChecker_FilterAuthorizationDetails_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'FilterAuthorizationDetails'
+type PermissionChecker_FilterAuthorizationDetails_Call struct {
+	*mock.Call
+}
+
+// FilterAuthorizationDetails is a helper method to define mock.On call
+//   - ctx context.Context
+//   - details []richauth.Detail
+//   - user *record.User
+func (_e *PermissionChecker_Expecter) FilterAuthorizationDetails(ctx any, details any, user any) *PermissionChecker_FilterAuthorizationDetails_Call {
+	return &PermissionChecker_FilterAuthorizationDetails_Call{Call: _e.mock.On("FilterAuthorizationDetails", ctx, details, user)}
+}
+
+func (_c *PermissionChecker_FilterAuthorizationDetails_Call) Run(run func(ctx context.Context, details []richauth.Detail, user *record.User)) *PermissionChecker_FilterAuthorizationDetails_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 []richauth.Detail
+		if args[1] != nil {
+			arg1 = args[1].([]richauth.Detail)
+		}
+		var arg2 *record.User
+		if args[2] != nil {
+			arg2 = args[2].(*record.User)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+		)
+	})
+	return _c
+}
+
+func (_c *PermissionChecker_FilterAuthorizationDetails_Call) Return(filtered []richauth.Detail, err error) *PermissionChecker_FilterAuthorizationDetails_Call {
+	_c.Call.Return(filtered, err)
+	return _c
+}
+
+func (_c *PermissionChecker_FilterAuthorizationDetails_Call) RunAndReturn(run func(context.Context, []richauth.Detail, *record.User) ([]richauth.Detail, error)) *PermissionChecker_FilterAuthorizationDetails_Call {
 	_c.Call.Return(run)
 	return _c
 }

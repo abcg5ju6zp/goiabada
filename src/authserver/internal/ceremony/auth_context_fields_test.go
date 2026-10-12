@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/leodip/goiabada/authserver/internal/richauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -37,6 +38,7 @@ var requestFields = []string{
 	"DeferredErrorCode",
 	"DeferredErrorDescription",
 	"RequestedScope",
+	"RequestedAuthorizationDetails",
 }
 
 var attemptFields = []string{
@@ -53,15 +55,18 @@ var attemptFields = []string{
 	"OTPKeyURL",
 	"PasswordVerifiedAt",
 	"OtpClaimGeneration",
+	"AuthorizationDetails",
+	"ConsentedAuthorizationDetails",
 }
 
-// restartedTo names the two attempt fields a restart does not leave at their zero value: the
-// state it restarts into, and the working scope it puts back from the request. Every other attempt
-// field is zero after Restart.
+// restartedTo names the attempt fields a restart does not leave at their zero value: the
+// state it restarts into, the working scope it puts back from the request, and the working
+// detail set it puts back the same way. Every other attempt field is zero after Restart.
 func restartedTo(filled *AuthContext) map[string]any {
 	return map[string]any{
-		"AuthState": AuthStateRequiresLevel1,
-		"Scope":     filled.RequestedScope,
+		"AuthState":          AuthStateRequiresLevel1,
+		"Scope":              filled.RequestedScope,
+		"AuthorizationDetails": filled.RequestedAuthorizationDetails,
 	}
 }
 
@@ -111,6 +116,12 @@ func fillEveryField(t *testing.T, ac *AuthContext) {
 			field.Set(reflect.ValueOf(&number))
 		case field.Type() == reflect.TypeOf([]string{}):
 			field.Set(reflect.ValueOf([]string{name + "-a", name + "-b"}))
+		case field.Type() == reflect.TypeOf([]richauth.Detail{}):
+			field.Set(reflect.ValueOf([]richauth.Detail{{
+				Type:     name + "-type",
+				Resource: name + "-resource",
+				Actions:  []string{name + "-action"},
+			}}))
 		default:
 			t.Fatalf("fillEveryField does not know how to fill AuthContext.%s of type %s", name, field.Type())
 		}

@@ -7,6 +7,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/richauth"
 	"github.com/leodip/goiabada/core/oauth"
 )
 
@@ -216,6 +217,23 @@ type AuthContext struct {
 	// Absent from a context written by an older binary it unmarshals as nil, and a claim with no
 	// generation never stands: the ceremony starts over from the password.
 	OtpClaimGeneration *int64
+	// RequestedAuthorizationDetails is the canonical RFC 9396 authorization_details set the
+	// client asked for, as /auth/authorize accepted it: typed, normalized, and validated
+	// against registered types, existing resources and the client's license. It is never
+	// narrowed, and Restart keeps it, exactly as RequestedScope does for scopes. Absent from
+	// an older context it unmarshals as nil, and a scope-only ceremony carries nil.
+	RequestedAuthorizationDetails []richauth.Detail
+	// AuthorizationDetails is the working copy RequestedAuthorizationDetails is narrowed to,
+	// at /auth/completed and prompt=none, against the permissions the authenticated user
+	// currently holds. Restart restores it from the request copy. It is what the consent
+	// screen displays.
+	AuthorizationDetails []richauth.Detail
+	// ConsentedAuthorizationDetails is the set the user ticked at the consent screen,
+	// re-filtered against the user's current permissions at submission, and the immutable
+	// snapshot the authorization code is written from. No browser parameter can overwrite
+	// it: HandleConsentPost reads it from the ceremony and writes it here, and /auth/issue
+	// copies it to the code verbatim. Restart discards it.
+	ConsentedAuthorizationDetails []richauth.Detail
 }
 
 func (ac *AuthContext) SetScope(scope string) {
@@ -340,6 +358,11 @@ func (ac *AuthContext) Restart() {
 	ac.AuthState = AuthStateRequiresLevel1
 	ac.Scope = ac.RequestedScope
 	ac.ConsentedScope = ""
+	// The working detail set is restored from the request, like Scope, and the first
+	// user's approval discarded, like ConsentedScope: whoever authenticates on the restart
+	// must narrow and approve the set themselves rather than inherit it.
+	ac.AuthorizationDetails = richauth.Clone(ac.RequestedAuthorizationDetails)
+	ac.ConsentedAuthorizationDetails = nil
 	ac.UserId = 0
 	ac.AcrLevel = ""
 	ac.AuthMethods = ""

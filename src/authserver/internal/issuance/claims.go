@@ -13,6 +13,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/richauth"
 	"github.com/leodip/goiabada/authserver/internal/userclaims"
 	"github.com/leodip/goiabada/authserver/internal/uuid"
 	"github.com/leodip/goiabada/core/builtin"
@@ -50,6 +51,11 @@ type tokenGenerationInput struct {
 	// offline_access exists for (#106 decision 9). ID tokens keep sid regardless, because
 	// RP-initiated logout matches on it.
 	GrantIsOffline bool
+
+	// AuthorizationDetails is the RFC 9396 set signed into the access token, copied from
+	// the code's immutable snapshot. Empty for scope-only grants, which is why the claim
+	// is omitted rather than written as an empty array.
+	AuthorizationDetails []richauth.Detail
 }
 
 // generateAccessToken builds an access token for the authorization code flow.
@@ -196,6 +202,14 @@ func (t *TokenIssuer) generateAccessTokenCore(ctx context.Context, tx *sql.Tx, s
 		claims["nonce"] = input.Nonce
 	}
 
+	// RFC 9396 authorization_details, present only when the code carried a snapshot.
+	// The token endpoint re-validated the snapshot against current data, so this is the
+	// consent-approved set verbatim: no narrowing, no reordering beyond the canonical
+	// form the code stored.
+	if len(input.AuthorizationDetails) > 0 {
+		claims[richauth.ParameterName] = input.AuthorizationDetails
+	}
+
 	// OpenID Connect claims in access token (if enabled)
 	includeOpenIDConnectClaimsInAccessToken := settings.IncludeOpenIDConnectClaimsInAccessToken
 	if input.Client.IncludeOpenIDConnectClaimsInAccessToken == record.ThreeStateSettingOn.String() ||
@@ -301,15 +315,21 @@ func (t *TokenIssuer) generateIdTokenCore(ctx context.Context, tx *sql.Tx, setti
 // createTokenInputFromCode creates a tokenGenerationInput from an authorization code.
 // Used by the authorization code flow.
 func (t *TokenIssuer) createTokenInputFromCode(code *record.Code) *tokenGenerationInput {
+	// The snapshot was canonical on write and the validator re-checked it at
+	// redemption, so a value that no longer parses is fail-closed: it reaches the
+	// access token as no details rather than minting a token the call could not
+	// inspect. No release writes a value that can fail here.
+	details, _ := richauth.UnmarshalStored(code.AuthorizationDetails)
 	return &tokenGenerationInput{
-		User:              &code.User,
-		Client:            &code.Client,
-		Scope:             code.Scope,
-		AcrLevel:          code.AcrLevel,
-		AuthMethods:       authMethodsToArray(code.AuthMethods),
-		AuthenticatedAt:   code.AuthenticatedAt,
-		SessionIdentifier: code.SessionIdentifier,
-		Nonce:             code.Nonce,
+		User:                 &code.User,
+		Client:               &code.Client,
+		Scope:                code.Scope,
+		AcrLevel:             code.AcrLevel,
+		AuthMethods:          authMethodsToArray(code.AuthMethods),
+		AuthenticatedAt:      code.AuthenticatedAt,
+		SessionIdentifier:    code.SessionIdentifier,
+		Nonce:                code.Nonce,
+		AuthorizationDetails: details,
 	}
 }
 

@@ -8,12 +8,14 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/leodip/goiabada/authserver/internal/audit"
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/richauth"
 	"github.com/leodip/goiabada/authserver/internal/userconsent"
 	"github.com/leodip/goiabada/core/builtin"
 	"github.com/leodip/goiabada/core/errs"
@@ -28,6 +30,29 @@ type ScopeInfo struct {
 	Scope            string
 	Description      string
 	AlreadyConsented bool
+}
+
+// DetailInfo is one RFC 9396 authorization_details item as the consent screen renders
+// it: the target resource and its actions, joined for the description template.
+type DetailInfo struct {
+	Resource    string
+	Actions     []string
+	ActionsText string
+}
+
+// buildDetailInfoArray renders the ceremony's working detail set for the consent screen.
+// Every action becomes a permission phrase so the page states exactly what the client
+// may do on which resource.
+func buildDetailInfoArray(details []richauth.Detail) []DetailInfo {
+	infos := make([]DetailInfo, 0, len(details))
+	for _, detail := range details {
+		infos = append(infos, DetailInfo{
+			Resource:    detail.Resource,
+			Actions:     detail.Actions,
+			ActionsText: strings.Join(detail.Actions, ", "),
+		})
+	}
+	return infos
 }
 
 func buildScopeInfoArray(ctx context.Context, scope string, consent *record.UserConsent) []ScopeInfo {
@@ -129,8 +154,10 @@ func HandleConsentGet(
 		}
 
 		scopeInfoArr := buildScopeInfoArray(r.Context(), authContext.Scope, consent)
+		detailInfoArr := buildDetailInfoArray(authContext.AuthorizationDetails)
 
-		if consentScreenOwed(scopeInfoArr, authContext.Scope, authContext.HasPromptValue("consent")) {
+		if consentScreenOwed(scopeInfoArr, authContext.Scope, authContext.HasPromptValue("consent"),
+			len(authContext.RequestedAuthorizationDetails) > 0) {
 			displayInfo := getClientDisplayInfo(r.Context(), database, client)
 
 			// The consent screen names the client through its own rule rather than through
@@ -158,6 +185,11 @@ func HandleConsentGet(
 				"clientWebsiteUrl":     displayInfo.WebsiteURL,
 				"hasLogo":              displayInfo.HasLogo,
 				"scopes":               scopeInfoArr,
+				// The RFC 9396 detail set displayed and ticked under its own table, in the
+				// ceremony's canonical order. HandleConsentPost resolves checkbox indices
+				// against this exact list and never reads a detail from the submitted body.
+				"details":    detailInfoArr,
+				"hasDetails": len(detailInfoArr) > 0,
 				// The rendered form says which ceremony rendered it, and HandleConsentPost
 				// refuses a submission naming any other one. The checkbox indices are only
 				// meaningful against this ceremony's scope list (#79).
@@ -186,13 +218,15 @@ func HandleConsentGet(
 // straight on to issuance. It is shown when:
 //   - not every requested scope is already consented, OR
 //   - offline_access is requested (a refresh token grant is always re-confirmed), OR
-//   - prompt=consent was explicitly requested (force consent UI).
-func consentScreenOwed(scopes []ScopeInfo, scope string, promptConsent bool) bool {
+//   - prompt=consent was explicitly requested (force consent UI), OR
+//   - the request carried authorization_details, which only the screen can approve; a
+//     stored scope consent never covers them.
+func consentScreenOwed(scopes []ScopeInfo, scope string, promptConsent, detailsRequested bool) bool {
 	fullyConsented := true
 	for _, scopeInfo := range scopes {
 		fullyConsented = fullyConsented && scopeInfo.AlreadyConsented
 	}
-	return !fullyConsented || oidc.HasOfflineAccessScope(scope) || promptConsent
+	return !fullyConsented || oidc.HasOfflineAccessScope(scope) || promptConsent || detailsRequested
 }
 
 func HandleConsentPost(
@@ -219,9 +253,14 @@ func HandleConsentPost(
 			return
 		}
 
-		facts := consentSubmissionFacts{approved: consentApproved(r.PostForm)}
+		detailInfos := buildDetailInfoArray(authContext.AuthorizationDetails)
+		facts := consentSubmissionFacts{
+			approved:         consentApproved(r.PostForm),
+			displayedDetails: len(detailInfos),
+		}
 		if facts.approved {
 			facts.ticked = tickedScopes(r.PostForm, buildScopeInfoArray(r.Context(), authContext.Scope, nil))
+			facts.tickedDetails = tickedDetails(r.PostForm, detailInfos)
 		}
 
 		// client and user are loaded only on the path that weighs the selection against the
@@ -270,6 +309,18 @@ func HandleConsentPost(
 					return
 				}
 				facts.heldScope = &heldScope
+
+				// The ticked detail set is weighed against the user's CURRENT grants too,
+				// for the same reason the scopes are: the screen may have sat open while an
+				// administrator removed a permission. Only what is still held becomes the
+				// code's immutable snapshot.
+				heldDetails, err := permissionChecker.FilterAuthorizationDetails(r.Context(),
+					facts.tickedDetails, user)
+				if err != nil {
+					pageRenderer.InternalServerError(w, r, err)
+					return
+				}
+				facts.heldDetails = &heldDetails
 			}
 			answer, need = decideConsentSubmission(facts)
 		}
@@ -308,6 +359,10 @@ func HandleConsentPost(
 				return
 			}
 			authContext.ConsentedScope = consent.Scope
+			// The approved, re-filtered detail set is the code's snapshot source. It comes
+			// from the ceremony, never from a form value: the body only carries positional
+			// ticks against the list the ceremony rendered.
+			authContext.ConsentedAuthorizationDetails = richauth.Clone(*facts.heldDetails)
 
 			auditLogger.Log(r.Context(), audit.EventSavedConsent, map[string]interface{}{
 				"user_id":    consent.UserId,
@@ -359,6 +414,24 @@ func tickedScopes(postForm url.Values, scopes []ScopeInfo) []string {
 	return ticked
 }
 
+// tickedDetails is the RFC 9396 detail items whose checkbox the body carries, resolved by
+// positional name authDetail0 .. authDetailN against the list the ceremony rendered. The
+// body names no resource or action, so it cannot inject or overwrite a detail; it only
+// ticks what the screen showed. It reads the body alone for the reason tickedScopes gives.
+func tickedDetails(postForm url.Values, details []DetailInfo) []richauth.Detail {
+	ticked := make([]richauth.Detail, 0, len(details))
+	for idx, info := range details {
+		if postForm.Has(fmt.Sprintf("authDetail%d", idx)) {
+			ticked = append(ticked, richauth.Detail{
+				Type:     richauth.ResourcePermissionDetailsType,
+				Resource: info.Resource,
+				Actions:  slices.Clone(info.Actions),
+			})
+		}
+	}
+	return ticked
+}
+
 // consentSubmissionFact is a fact decideConsentSubmission needs and has not been given.
 // HandleConsentPost loads it and asks again.
 type consentSubmissionFact int
@@ -389,13 +462,19 @@ const (
 	consentSubmissionGranted
 )
 
-// consentSubmissionFacts is what decideConsentSubmission decides from. The held scope is nil
-// until HandleConsentPost has loaded it.
+// consentSubmissionFacts is what decideConsentSubmission decides from. The held scope and
+// held detail set are nil until HandleConsentPost has loaded them.
 type consentSubmissionFacts struct {
 	approved bool
 	// ticked is the scopes the user ticked, read only for an approval.
-	ticked    []string
-	heldScope *string
+	ticked []string
+	// displayedDetails is how many detail rows the screen rendered, so an approval with
+	// nothing ticked is distinguishable from a scope-only submission.
+	displayedDetails int
+	// tickedDetails is the detail items the user ticked.
+	tickedDetails []richauth.Detail
+	heldScope     *string
+	heldDetails   *[]richauth.Detail
 }
 
 // decideConsentSubmission decides how a consent submission is answered, or names the next fact it
@@ -404,19 +483,20 @@ type consentSubmissionFacts struct {
 // Refusal is decided by what was consented to, not by whether a key named consent... arrived. A
 // submission matching no scope used to reach the issuers with an empty consented scope, which they
 // read as "no consent screen was shown" and answer with the full requested scope (#79). The held
-// scope is asked for only once something was ticked, so a refusal the user chose reads no
-// permission.
+// scope and detail set are asked for only once something was ticked, so a refusal the user chose
+// reads no permission. A screen that displayed details also requires a ticked and still-held
+// detail, because the code snapshot is exactly the approved set.
 func decideConsentSubmission(f consentSubmissionFacts) (consentSubmissionAnswer, consentSubmissionFact) {
 	if !f.approved {
 		return consentSubmissionDeclined, consentSubmissionFactNone
 	}
-	if len(f.ticked) == 0 {
+	if len(f.ticked) == 0 || (f.displayedDetails > 0 && len(f.tickedDetails) == 0) {
 		return consentSubmissionNothingTicked, consentSubmissionFactNone
 	}
 	if f.heldScope == nil {
 		return consentSubmissionUndecided, consentSubmissionFactHeldScope
 	}
-	if *f.heldScope == "" {
+	if *f.heldScope == "" || (f.displayedDetails > 0 && len(*f.heldDetails) == 0) {
 		return consentSubmissionNothingHeld, consentSubmissionFactNone
 	}
 	return consentSubmissionGranted, consentSubmissionFactNone

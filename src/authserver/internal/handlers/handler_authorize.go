@@ -21,6 +21,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
+	"github.com/leodip/goiabada/authserver/internal/richauth"
 	"github.com/leodip/goiabada/authserver/internal/urlmatch"
 	"github.com/leodip/goiabada/authserver/internal/userconsent"
 	"github.com/leodip/goiabada/core/errs"
@@ -311,6 +312,12 @@ func HandleAuthorizeGet(
 				refusedAdministrativeScopes = validation.refusedAdministrativeScopes
 				authContext.Prompt = validation.prompt
 				authContext.IdTokenHintSub = validation.hintSubject
+				// The one place the accepted request's detail set is written. The request
+				// copy is never narrowed; the working copy is what /auth/completed narrows and
+				// the consent screen displays. They start equal, as Scope and RequestedScope
+				// do. Written only here in the writer the request-field guard names.
+				authContext.RequestedAuthorizationDetails = validation.authorizationDetails
+				authContext.AuthorizationDetails = richauth.Clone(validation.authorizationDetails)
 				if refusal == nil {
 					// The authentication level this ceremony must reach is fixed HERE, at the one
 					// point the request has been accepted and before any handler acts on it, and
@@ -448,7 +455,7 @@ var authorizeDeliveryParameters = []string{"client_id", "redirect_uri", "respons
 var authorizeRequestParameters = []string{
 	"client_id", "redirect_uri", "response_type", "response_mode",
 	"code_challenge", "code_challenge_method", "max_age", "acr_values", "state", "nonce", "scope",
-	"ui_locales", "prompt", "id_token_hint",
+	"ui_locales", "prompt", "id_token_hint", richauth.ParameterName,
 }
 
 // authorizeParameters answers the authorization request's parameters, the query and a form body
@@ -590,6 +597,10 @@ type authorizeValidation struct {
 	// refusedAdministrativeScopes is the administrative scopes the refusal is for, when the client
 	// may not request them, and nil for every other refusal.
 	refusedAdministrativeScopes []string
+	// authorizationDetails is the canonical RFC 9396 set once its validation accepted it, nil
+	// for a scope-only request. HandleAuthorizeGet copies it to both the request and working
+	// context fields; it is not recomputed at any later hop.
+	authorizationDetails []richauth.Detail
 }
 
 // validateAuthorizeRequest runs the validations that answer by redirect, in the order the client is
@@ -662,6 +673,21 @@ func validateAuthorizeRequest(ctx context.Context, authorizeValidator AuthorizeV
 		validation.refusedAdministrativeScopes = refused
 		return validation, nil
 	}
+
+	// RFC 9396 authorization_details, after the scopes and the client's administrative
+	// allowance: it answers in terms of the client and existing resources. The raw value
+	// is the parameter as sent, and the canonical answer is what both context fields carry;
+	// no later hop parses the browser's value again.
+	details, err := authorizeValidator.ValidateAuthorizationDetails(ctx,
+		&protocolvalidation.ValidateAuthorizationDetailsInput{
+			Client:       client,
+			Raw:          params.Get("authorization_details"),
+			ResponseType: request.ResponseType,
+		})
+	if err != nil {
+		return stop(err)
+	}
+	validation.authorizationDetails = details
 
 	normalizedPrompt, err := authorizeValidator.ValidatePrompt(params.Get("prompt"))
 	if err != nil {
@@ -869,6 +895,9 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageR
 		target:           authContext.GetTargetAcrLevel(client.DefaultAcrLevel),
 		consentRequired:  client.ConsentRequired,
 		clientIdentifier: client.ClientIdentifier,
+		// A rich authorization request always needs an interactive consent: no stored
+		// consent can cover authorization_details, so prompt=none can never issue one.
+		detailsRequested: len(authContext.RequestedAuthorizationDetails) > 0,
 	}
 
 	// The loads, each made once and only when decideSilentAuthentication asks for it, so a refusal
@@ -909,6 +938,17 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageR
 			}
 			facts.effectiveScope = &effectiveScope
 
+		case silentFactEffectiveDetails:
+			// Narrowed against the user's CURRENT grants, like the scope beside it; this
+			// is a reader and writes nothing until the decision below succeeds.
+			effectiveDetails, err := permissionChecker.FilterAuthorizationDetails(r.Context(),
+				authContext.RequestedAuthorizationDetails, &facts.session.User)
+			if err != nil {
+				pageRenderer.InternalServerError(w, r, err)
+				return
+			}
+			facts.effectiveDetails = &effectiveDetails
+
 		case silentFactConsent:
 			consent, err := database.GetConsentByUserIdAndClientId(r.Context(), nil, facts.session.User.Id, client.Id)
 			if err != nil {
@@ -935,6 +975,15 @@ func handlePromptNone(w http.ResponseWriter, r *http.Request, pageRenderer PageR
 	userSession := facts.session
 	authContext.AdoptSession(userSession)
 	authContext.SetScope(*facts.effectiveScope)
+	// A request with details never reaches here (the decision above refuses it with
+	// consent_required); the nil assignments keep the snapshot source coherent for the
+	// scope-only requests that do.
+	effectiveDetails := []richauth.Detail(nil)
+	if facts.effectiveDetails != nil {
+		effectiveDetails = *facts.effectiveDetails
+	}
+	authContext.AuthorizationDetails = effectiveDetails
+	authContext.ConsentedAuthorizationDetails = richauth.Clone(effectiveDetails)
 
 	// Preserve the original session's auth_time for the token
 	if userSession.AuthTime.IsZero() {
@@ -993,6 +1042,9 @@ const (
 	silentFactValidityWithoutMaxAge
 	// silentFactEffectiveScope is the requested scope narrowed to what the user holds.
 	silentFactEffectiveScope
+	// silentFactEffectiveDetails is the requested authorization_details set narrowed to
+	// what the user currently holds.
+	silentFactEffectiveDetails
 	// silentFactConsent is the user's consent to this client, or none.
 	silentFactConsent
 )
@@ -1008,6 +1060,9 @@ type silentAuthenticationFacts struct {
 	consentRequired bool
 	// clientIdentifier is the client's ClientIdentifier.
 	clientIdentifier string
+	// detailsRequested says the request carried authorization_details, which can never
+	// be granted silently: the consent screen is the only place they are approved.
+	detailsRequested bool
 
 	// sessionLoaded is set once the session has been looked up; session is nil when there is none,
 	// and otherwise carries its User.
@@ -1016,6 +1071,8 @@ type silentAuthenticationFacts struct {
 	sessionValid              *bool
 	sessionValidWithoutMaxAge *bool
 	effectiveScope            *string
+	// effectiveDetails is the requested detail set narrowed to what the user holds now.
+	effectiveDetails *[]richauth.Detail
 	// consentLoaded is set once the consent has been looked up; consent is nil when there is none.
 	consentLoaded bool
 	consent       *record.UserConsent
@@ -1099,6 +1156,20 @@ func decideSilentAuthentication(f silentAuthenticationFacts) (silentAuthenticati
 	}
 	if len(strings.TrimSpace(*f.effectiveScope)) == 0 {
 		return refuse("access_denied", "The user is not authorized to access any of the requested scopes")
+	}
+
+	// RFC 9396: a rich authorization request can never be answered silently. The set is
+	// first narrowed to the user's current grants, so one the user holds nothing in gets
+	// the same access_denied an out-of-scope request does; anything left requires the
+	// interactive consent screen, where the exact detail set is displayed and ticked.
+	if f.detailsRequested {
+		if f.effectiveDetails == nil {
+			return silentAuthenticationAnswer{}, silentFactEffectiveDetails
+		}
+		if len(*f.effectiveDetails) == 0 {
+			return refuse("access_denied", "The user is not authorized for any of the requested authorization details")
+		}
+		return refuse(oidc.ErrorConsentRequired, "User consent is required for the requested authorization details")
 	}
 
 	// The scopes a stored consent must cover: every one when the client requires consent or

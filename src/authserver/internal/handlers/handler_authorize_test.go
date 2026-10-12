@@ -104,6 +104,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+		authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 
 		userSession := &record.UserSession{
 			Id:     1,
@@ -185,6 +186,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+		authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
 
@@ -391,6 +393,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateRequest", mock.Anything).Return(nil)
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+		authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 
 		seen := map[string]bool{}
 		for i := 0; i < 2; i++ {
@@ -752,6 +755,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+		authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 
 		userSession := &record.UserSession{
 			Id:     1,
@@ -814,6 +818,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateRequest", mock.Anything).Return(nil)
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+		authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 
 		saveErr := errors.New("the session store is unreachable")
 		ceremonyStore.On("SaveAuthContext", rr, req, mock.AnythingOfType("*ceremony.AuthContext")).Return(saveErr).Once()
@@ -867,6 +872,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+		authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 
 		userSession := &record.UserSession{
 			Id:          1,
@@ -948,6 +954,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+		authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
@@ -1073,6 +1080,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateRequest", mock.Anything).Return(nil)
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+		authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 
 		// The one save, on the way to /auth/level1, carries the captured UILocales. The request
 		// pointer changes when the handler refines the localizer to the ui_locales it just
@@ -1143,6 +1151,7 @@ func TestHandleAuthorizeGet(t *testing.T) {
 		authorizeValidator.On("ValidateRequest", mock.Anything).Return(nil)
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+		authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 
 		ceremonyStore.On("SaveAuthContext", rr, mock.Anything, mock.MatchedBy(func(ac *ceremony.AuthContext) bool {
 			return ac.AuthState == ceremony.AuthStateRequiresLevel1 && hasUILocales(ac)
@@ -2189,6 +2198,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		})).Return(nil)
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+		authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
@@ -2254,6 +2264,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		})).Return(nil)
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+		authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
@@ -2379,6 +2390,7 @@ func TestHandleAuthorizeGet_ImplicitFlow(t *testing.T) {
 		})).Return(nil)
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+		authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 
 		database.On("GetUserSessionBySessionIdentifier", mock.Anything, mock.Anything, mock.AnythingOfType("string")).Return(nil, nil)
 		database.On("UserSessionLoadUser", mock.Anything, mock.Anything, (*record.UserSession)(nil)).Return(nil)
@@ -2487,6 +2499,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+		authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 
 		tokenParser.On("DecodeAndValidateTokenString", mock.Anything, "bad-jwt-token", false).Return(nil, errors.New("signature verification failed"))
 
@@ -2546,6 +2559,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+		authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 
 		wrongIssuerToken := &oauth.JwtToken{
 			TokenBase64: "valid-jwt-wrong-issuer",
@@ -2614,6 +2628,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+		authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 
 		accessToken := &oauth.JwtToken{
 			TokenBase64: "an-access-token",
@@ -2683,6 +2698,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+		authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 
 		noSubToken := &oauth.JwtToken{
 			TokenBase64: "valid-jwt-no-sub",
@@ -2749,6 +2765,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+		authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 
 		expiredToken := &oauth.JwtToken{
 			TokenBase64: "expired-jwt-token",
@@ -2833,6 +2850,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+		authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 
 		validToken := &oauth.JwtToken{
 			TokenBase64: "valid-jwt-token",
@@ -2919,6 +2937,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "").Return("", nil)
+		authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 
 		differentUserToken := &oauth.JwtToken{
 			TokenBase64: "different-user-jwt",
@@ -3007,6 +3026,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
+		authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 
 		validToken := &oauth.JwtToken{
 			TokenBase64: "valid-jwt-token",
@@ -3125,6 +3145,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
 		authorizeValidator.On("ValidateScopes", mock.Anything, requestedScope).Return(nil)
 		authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
+		authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 
 		validToken := &oauth.JwtToken{
 			TokenBase64: "valid-jwt-token",
@@ -3231,6 +3252,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
+		authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 
 		differentUserToken := &oauth.JwtToken{
 			TokenBase64: "different-user-jwt",
@@ -3325,6 +3347,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
+		authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 
 		differentUserToken := &oauth.JwtToken{
 			TokenBase64: "different-user-jwt",
@@ -3423,6 +3446,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
+		authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 
 		differentUserToken := &oauth.JwtToken{
 			TokenBase64: "different-user-jwt",
@@ -3513,6 +3537,7 @@ func TestHandleAuthorizeGet_IdTokenHint(t *testing.T) {
 		authorizeValidator.On("ValidateRequest", mock.AnythingOfType("*protocolvalidation.ValidateRequestInput")).Return(nil)
 		authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 		authorizeValidator.On("ValidatePrompt", "none").Return("none", nil)
+		authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 
 		differentUserToken := &oauth.JwtToken{
 			TokenBase64: "different-user-jwt",

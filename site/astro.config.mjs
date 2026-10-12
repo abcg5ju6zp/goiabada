@@ -120,6 +120,7 @@ export default defineConfig({
 						{ label: 'Password recovery', slug: 'concepts/password-recovery' },
 						{ label: 'Resources and permissions', slug: 'concepts/resources-and-permissions' },
 						{ label: 'Scopes', slug: 'concepts/scopes' },
+						{ label: 'Rich authorization requests', slug: 'concepts/rich-authorization-requests' },
 						{ label: 'Tokens', slug: 'concepts/tokens' },
 						{ label: 'Refresh tokens', slug: 'concepts/refresh-tokens' },
 						{ label: 'Sessions', slug: 'concepts/sessions' },

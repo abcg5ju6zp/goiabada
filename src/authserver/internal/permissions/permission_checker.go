@@ -8,10 +8,12 @@ package permissions
 import (
 	"context"
 	"database/sql"
+	"slices"
 	"strings"
 
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/richauth"
 	"github.com/leodip/goiabada/core/errs"
 )
 
@@ -273,4 +275,85 @@ func (pc *Checker) FilterOutScopesWhereUserIsNotAuthorized(ctx context.Context, 
 	}
 
 	return strings.TrimSpace(newScope), nil
+}
+
+// FilterAuthorizationDetails keeps the actions the user holds on each item and drops the
+// rest, the authorization_details twin of FilterOutScopesWhereUserIsNotAuthorized: an
+// item naming a resource that no longer exists, an action that no longer exists, or an
+// action the user does not hold directly or through a group is stripped, and an item left
+// with no held action is dropped. The answer is canonical.
+//
+// The request this narrows was already validated against existing resources and the
+// client's license at /auth/authorize; this is the current-user half of the rule, read at
+// /auth/completed, at the consent POST and at prompt=none, exactly as it is for scopes.
+// Resources are resolved once and the user's grants are loaded once, at the first action
+// that resolves, rather than per action.
+func (pc *Checker) FilterAuthorizationDetails(ctx context.Context, details []richauth.Detail, user *record.User) ([]richauth.Detail, error) {
+
+	if user == nil {
+		return nil, errs.New("user is nil")
+	}
+	if len(details) == 0 {
+		return nil, nil
+	}
+
+	result := make([]richauth.Detail, 0, len(details))
+	var holder *record.User
+	holderLoaded := false
+
+	for _, detail := range details {
+		res, err := pc.database.GetResourceByResourceIdentifier(ctx, nil, detail.Resource)
+		if err != nil {
+			return nil, err
+		}
+		if res == nil {
+			// Deleted since /auth/authorize: nobody holds it.
+			continue
+		}
+		perms, err := pc.database.GetPermissionsByResourceId(ctx, nil, res.Id)
+		if err != nil {
+			return nil, err
+		}
+
+		heldActions := make([]string, 0, len(detail.Actions))
+		for _, action := range detail.Actions {
+			var permissionId int64
+			found := false
+			for _, perm := range perms {
+				if perm.PermissionIdentifier == action {
+					permissionId = perm.Id
+					found = true
+					break
+				}
+			}
+			if !found {
+				continue
+			}
+			if !holderLoaded {
+				holder, err = pc.loadGrantHolder(ctx, user.Id)
+				if err != nil {
+					return nil, err
+				}
+				holderLoaded = true
+			}
+			// A nil holder is a user deleted since the caller's read: every action goes.
+			if holder != nil && holdsPermission(holder, permissionId) {
+				heldActions = append(heldActions, action)
+			}
+		}
+
+		if len(heldActions) > 0 {
+			slices.Sort(heldActions)
+			result = append(result, richauth.Detail{
+				Type:     detail.Type,
+				Resource: detail.Resource,
+				Actions:  heldActions,
+			})
+		}
+	}
+
+	slices.SortFunc(result, func(a, b richauth.Detail) int {
+		return strings.Compare(a.Resource, b.Resource)
+	})
+	return result, nil
 }

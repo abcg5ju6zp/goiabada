@@ -17,6 +17,9 @@ type WellKnownConfig struct {
 	IdTokenSigningAlgValuesSupported  []string `json:"id_token_signing_alg_values_supported"`
 	ScopesSupported                   []string `json:"scopes_supported"`
 	ClaimsSupported                   []string `json:"claims_supported"`
+	// AuthorizationDetailsTypesSupported lists the RFC 9396 authorization_details
+	// types the server implements, one today.
+	AuthorizationDetailsTypesSupported []string `json:"authorization_details_types_supported"`
 	TokenEndpointAuthMethodsSupported []string `json:"token_endpoint_auth_methods_supported"`
 	CodeChallengeMethodsSupported     []string `json:"code_challenge_methods_supported"`
 	// Written false, never omitted: OIDC Discovery 1.0 section 3 reads an absent

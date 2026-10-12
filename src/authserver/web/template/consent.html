@@ -45,6 +45,24 @@
                 </tbody>
             </table>
 
+            {{if .hasDetails}}
+            <h3 class="mt-5 mb-1 text-lg font-semibold">{{ T $.ctx "consent.details.heading" }}</h3>
+            <p class="text-sm text-base-content/70">{{ T $.ctx "consent.details.intro" }}</p>
+            <table class="mt-2 table-auto">
+                <tbody>
+                {{range $i, $d := .details}}
+                    <tr>
+                        <td>
+                            <input type="checkbox" id="authDetail{{$i}}" name="authDetail{{$i}}" checked />
+                        </td>
+                        <td class="p-2"><label for="authDetail{{$i}}">{{.Resource}}</label></td>
+                        <td class="p-2">{{ T $.ctx "consent.details.permission_template" "actions" .ActionsText "resource" .Resource }}</td>
+                    </tr>
+                {{end}}
+                </tbody>
+            </table>
+            {{end}}
+
             <button class="w-full mt-3 btn btn-neutral" name="btnCancel" value="cancel">{{ T $.ctx "consent.button.cancel" }}</button>
             <button class="w-full mt-3 btn btn-primary" name="btnSubmit" value="submit">{{ T $.ctx "consent.button.submit" }}</button>
 

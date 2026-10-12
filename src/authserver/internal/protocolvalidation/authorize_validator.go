@@ -12,6 +12,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/permissions"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/richauth"
 	"github.com/leodip/goiabada/authserver/internal/urlmatch"
 	"github.com/leodip/goiabada/core/i18n"
 	"github.com/leodip/goiabada/core/oauth"
@@ -24,6 +25,7 @@ import (
 type authorizeValidatorDatabase interface {
 	permissions.ScopeResolverDatabase
 
+	ClientLoadPermissions(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	ClientLoadRedirectURIs(ctx context.Context, tx *sql.Tx, client *record.Client) error
 	GetClientByClientIdentifier(ctx context.Context, tx *sql.Tx, clientIdentifier string) (*record.Client, error)
 }
@@ -42,6 +44,15 @@ type ValidateClientAndRedirectURIInput struct {
 type ValidateUnsupportedRequestParametersInput struct {
 	HasRequest    bool
 	HasRequestURI bool
+}
+
+// ValidateAuthorizationDetailsInput carries what the authorization_details validation
+// needs: the client whose license is checked, the raw parameter and the response type,
+// because rich authorization requests are accepted on the authorization code flow alone.
+type ValidateAuthorizationDetailsInput struct {
+	Client       *record.Client
+	Raw          string
+	ResponseType string
 }
 
 type ValidateRequestInput struct {
@@ -138,6 +149,97 @@ func (val *AuthorizeValidator) ValidateScopes(ctx context.Context, scope string)
 		}
 	}
 	return nil
+}
+
+// ValidateAuthorizationDetails parses and validates an RFC 9396 authorization_details
+// parameter against what this server and the requesting client are. It answers the
+// canonical set on success, or nil for a scope-only request, and an *oauth.ErrorDetail the
+// caller redirects (or parks behind a login) like every other /auth/authorize refusal.
+//
+// The syntax, size, type-registry and duplicate-item rules are richauth.Parse's. The rest
+// is this server's own entitlement check, in the same two halves scopes have:
+//
+//   - every named resource must exist, and every action must be a permission declared on
+//     that resource;
+//   - the client must be licensed for every permission, compared by permission row id the
+//     way validateClientCredentialsScopes does (#104), not by bare identifier.
+//
+// What the authenticated USER holds is deliberately not checked here: on a signed-out
+// request there is no user yet. The /auth/completed and consent steps narrow the canonical
+// set to the user's current grants, and the token endpoint re-checks all three halves
+// before it writes the snapshot into an access token.
+//
+// Rich authorization requests are accepted on the authorization code flow alone: only a
+// code carries the immutable snapshot a detail set is bound to.
+func (val *AuthorizeValidator) ValidateAuthorizationDetails(ctx context.Context,
+	input *ValidateAuthorizationDetailsInput) ([]richauth.Detail, error) {
+
+	details, parseErr := richauth.Parse(input.Raw)
+	if parseErr != nil {
+		return nil, parseErr
+	}
+	if len(details) == 0 {
+		return nil, nil
+	}
+
+	if !ParseResponseType(input.ResponseType).IsCodeOnly() {
+		return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_request",
+			"The 'authorization_details' parameter is only supported with response_type=code (the authorization code flow).",
+			http.StatusBadRequest)
+	}
+
+	if err := val.database.ClientLoadPermissions(ctx, nil, input.Client); err != nil {
+		return nil, err
+	}
+
+	for _, detail := range details {
+		resource, err := val.database.GetResourceByResourceIdentifier(ctx, nil, detail.Resource)
+		if err != nil {
+			return nil, err
+		}
+		if resource == nil {
+			return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_request",
+				fmt.Sprintf("authorization_details names a resource with identifier %q that does not exist.", detail.Resource),
+				http.StatusBadRequest)
+		}
+
+		declared, err := val.database.GetPermissionsByResourceId(ctx, nil, resource.Id)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, action := range detail.Actions {
+			var permission *record.Permission
+			for i := range declared {
+				if declared[i].PermissionIdentifier == action {
+					permission = &declared[i]
+					break
+				}
+			}
+			if permission == nil {
+				return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_request",
+					fmt.Sprintf("authorization_details names action %q on resource %q, which declares no such permission.",
+						action, detail.Resource),
+					http.StatusBadRequest)
+			}
+
+			clientHolds := false
+			for _, clientPermission := range input.Client.Permissions {
+				if clientPermission.Id == permission.Id {
+					clientHolds = true
+					break
+				}
+			}
+			if !clientHolds {
+				return nil, oauth.NewErrorDetailWithHTTPStatus("invalid_request",
+					fmt.Sprintf("authorization_details names action %q on resource %q, but the client is not licensed for that permission.",
+						action, detail.Resource),
+					http.StatusBadRequest)
+			}
+		}
+	}
+
+	return details, nil
 }
 
 // ValidateClientAndRedirectURI answers RFC 6749 4.1.2.1: a missing or invalid client_id, or a

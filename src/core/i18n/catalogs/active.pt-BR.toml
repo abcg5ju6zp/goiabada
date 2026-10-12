@@ -92,6 +92,9 @@
 "consent.scope.offline_access.description" = "Acesso a um token de atualização offline, permitindo que o cliente obtenha um novo token de acesso sem exigir sua interação imediata"
 "consent.scope.permission_template" = "Permissão {{.permission}} no recurso {{.resource}}"
 "consent.scope.authserver_manage_account.description" = "Gerenciar sua conta por você: alterar seu perfil, telefone, endereço e foto, ver e encerrar suas sessões e revogar consentimentos que você deu. Alterar seu e-mail, senha ou autenticação de dois fatores ainda exige sua senha."
+"consent.details.heading" = "Permissões de recurso solicitadas"
+"consent.details.intro" = "O cliente também solicitou estas permissões específicas, expressas como detalhes de autorização:"
+"consent.details.permission_template" = "Permissões {{.actions}} no recurso {{.resource}}"
 
 # --- Confirmação de logout (auth/logout) -------------------------------------
 

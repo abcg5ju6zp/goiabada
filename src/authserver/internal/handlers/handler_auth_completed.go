@@ -14,6 +14,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/oidc"
 	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/richauth"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/revocation"
 	"github.com/leodip/goiabada/authserver/internal/userconsent"
@@ -210,6 +211,9 @@ func HandleAuthCompletedGet(
 			promptConsent:    authContext.HasPromptValue("consent"),
 			consentRequired:  client.ConsentRequired,
 			clientIdentifier: client.ClientIdentifier,
+			// The request carried RFC 9396 authorization_details, which always go through
+			// the consent screen, whatever the client's consent setting.
+			detailsRequested: len(authContext.RequestedAuthorizationDetails) > 0,
 		}
 		answer, need := decideAfterBinding(facts)
 		for need != afterBindingFactNone {
@@ -225,6 +229,17 @@ func HandleAuthCompletedGet(
 				authContext.SetScope(effectiveScope)
 				scope := authContext.Scope
 				facts.effectiveScope = &scope
+			case afterBindingFactEffectiveDetails:
+				// The working detail set narrowed, once, against the permissions the
+				// authenticated user currently holds. The request copy is untouched.
+				effectiveDetails, filterErr := permissionChecker.FilterAuthorizationDetails(r.Context(),
+					authContext.RequestedAuthorizationDetails, user)
+				if filterErr != nil {
+					pageRenderer.InternalServerError(w, r, filterErr)
+					return
+				}
+				authContext.AuthorizationDetails = effectiveDetails
+				facts.effectiveDetails = &effectiveDetails
 			case afterBindingFactConsent:
 				consent, consentErr := database.GetConsentByUserIdAndClientId(r.Context(), nil, user.Id, client.Id)
 				if consentErr != nil {
@@ -251,6 +266,10 @@ func HandleAuthCompletedGet(
 			}
 			http.Redirect(w, r, ceremonyStepURL(baseURL, "/auth/consent", authContext), http.StatusFound)
 		default:
+			// No consent screen is shown, so the narrowed working set is the approved
+			// snapshot. Requests with details are always routed to consent above, so this
+			// is nil in practice; assigning it here makes the snapshot source unconditional.
+			authContext.ConsentedAuthorizationDetails = richauth.Clone(authContext.AuthorizationDetails)
 			authContext.AuthState = ceremony.AuthStateReadyToIssueCode
 			err = ceremonyStore.SaveAuthContext(w, r, authContext)
 			if err != nil {
@@ -685,6 +704,9 @@ const (
 	// afterBindingFactEffectiveScope is the ceremony's scope narrowed to what the user holds, as
 	// AuthContext.SetScope stores it.
 	afterBindingFactEffectiveScope
+	// afterBindingFactEffectiveDetails is the requested authorization_details set narrowed
+	// to the actions the user currently holds.
+	afterBindingFactEffectiveDetails
 	// afterBindingFactConsent is the user's stored consent to the client, or none.
 	afterBindingFactConsent
 )
@@ -712,7 +734,12 @@ type afterBindingFacts struct {
 	consentRequired bool
 	// clientIdentifier is the client's ClientIdentifier.
 	clientIdentifier string
-	effectiveScope   *string
+	// detailsRequested says the request carried authorization_details, which always
+	// require the consent screen.
+	detailsRequested bool
+	effectiveScope    *string
+	// effectiveDetails is the requested detail set narrowed to what the user holds now.
+	effectiveDetails *[]richauth.Detail
 	// consentLoaded is set once the consent has been looked up; consent is nil when there is none.
 	consentLoaded bool
 	consent       *record.UserConsent
@@ -724,9 +751,10 @@ type afterBindingFacts struct {
 // may be issued something. prompt=consent forces the consent screen regardless of an existing
 // consent or the client's setting; otherwise it is shown when the client requires it or
 // offline_access is asked for, and the consent step then skips it for a scope already consented.
-// Short of those, a scope owed a consent whatever the client says (userconsent.AlwaysOwed) goes to
-// the consent screen unless the user's stored consent covers it, which is the one case the stored
-// consent is read here (#509 decision 1).
+// A request carrying authorization_details always goes: the detail set is approved by tick,
+// never by a stored scope consent. Short of those, a scope owed a consent whatever the client
+// says (userconsent.AlwaysOwed) goes to the consent screen unless the user's stored consent
+// covers it, which is the one case the stored consent is read here (#509 decision 1).
 func decideAfterBinding(f afterBindingFacts) (afterBindingAnswer, afterBindingFact) {
 	if f.effectiveScope == nil {
 		return afterBindingUndecided, afterBindingFactEffectiveScope
@@ -734,7 +762,10 @@ func decideAfterBinding(f afterBindingFacts) (afterBindingAnswer, afterBindingFa
 	if len(*f.effectiveScope) == 0 {
 		return afterBindingNoScope, afterBindingFactNone
 	}
-	if f.promptConsent || f.consentRequired || oidc.HasOfflineAccessScope(*f.effectiveScope) {
+	if f.detailsRequested && f.effectiveDetails == nil {
+		return afterBindingUndecided, afterBindingFactEffectiveDetails
+	}
+	if f.promptConsent || f.consentRequired || oidc.HasOfflineAccessScope(*f.effectiveScope) || f.detailsRequested {
 		return afterBindingConsent, afterBindingFactNone
 	}
 	if owed := userconsent.AlwaysOwed(f.clientIdentifier, *f.effectiveScope); len(owed) > 0 {

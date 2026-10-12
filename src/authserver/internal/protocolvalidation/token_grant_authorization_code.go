@@ -308,5 +308,15 @@ func (val *TokenValidator) validateAuthorizationCodeGrant(ctx context.Context, c
 		return nil, ErrCodeRedirectURIDeregistered
 	}
 
+	// The RFC 9396 boundary, below the registration boundary for the reason the group
+	// above states: an unauthenticated presenter must get the flat "Code is invalid." the
+	// account-state checks return, while an authenticated presenter is refused a token
+	// whose snapshot names a resource, action, client license or current user grant that
+	// is no longer valid. Nothing narrows the snapshot: the access token claim equals the
+	// consent-approved code, or no token is issued.
+	if err := val.recheckAuthorizationDetails(ctx, client, codeEntity); err != nil {
+		return nil, err
+	}
+
 	return &AuthorizationCodeGrant{Code: codeEntity}, nil
 }

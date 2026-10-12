@@ -5,6 +5,7 @@ import (
 
 	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/richauth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -221,6 +222,10 @@ type afterBindingWorld struct {
 	clientIdentifier string
 	effectiveScope   string
 	consentScope     *string // nil for no consent row
+	// detailsRequested says the request carried authorization_details; effectiveDetails
+	// is what the user currently holds (nil means none).
+	detailsRequested bool
+	effectiveDetails []richauth.Detail
 }
 
 // driveAfterBinding runs decideAfterBinding as HandleAuthCompletedGet does, loading each fact it
@@ -232,6 +237,7 @@ func driveAfterBinding(t *testing.T, world afterBindingWorld) (afterBindingAnswe
 		promptConsent:    world.promptConsent,
 		consentRequired:  world.consentRequired,
 		clientIdentifier: world.clientIdentifier,
+		detailsRequested: world.detailsRequested,
 	}
 	var asked []afterBindingFact
 	for {
@@ -247,6 +253,9 @@ func driveAfterBinding(t *testing.T, world afterBindingWorld) (afterBindingAnswe
 		case afterBindingFactEffectiveScope:
 			scope := world.effectiveScope
 			facts.effectiveScope = &scope
+		case afterBindingFactEffectiveDetails:
+			details := world.effectiveDetails
+			facts.effectiveDetails = &details
 		case afterBindingFactConsent:
 			facts.consentLoaded = true
 			if world.consentScope != nil {
@@ -363,6 +372,31 @@ func TestDecideAfterBinding(t *testing.T) {
 			name:       "no scope is refused before manage-account is asked about",
 			world:      afterBindingWorld{clientIdentifier: "crafted-link-client", effectiveScope: ""},
 			wantAnswer: afterBindingNoScope,
+			wantReads:  []afterBindingFact{scope},
+		},
+
+		// RFC 9396 authorization_details.
+		{
+			name:       "a rich request loads its effective details and always goes to consent",
+			world:      afterBindingWorld{detailsRequested: true, effectiveScope: "openid", effectiveDetails: []richauth.Detail{{Resource: "billing", Actions: []string{"read"}}}},
+			wantAnswer: afterBindingConsent,
+			wantReads:  []afterBindingFact{scope, afterBindingFactEffectiveDetails},
+		},
+		{
+			// A stored scope consent can never cover an item-level approval, whatever
+			// the client's consent setting.
+			name: "a rich request goes to consent even with a full stored scope consent",
+			world: afterBindingWorld{detailsRequested: true, effectiveScope: "openid",
+				consentScope:     scopes("openid"),
+				clientIdentifier: "crafted-link-client",
+				effectiveDetails: []richauth.Detail{{Resource: "billing", Actions: []string{"read"}}}},
+			wantAnswer: afterBindingConsent,
+			wantReads:  []afterBindingFact{scope, afterBindingFactEffectiveDetails},
+		},
+		{
+			name:       "a request without details does not load the detail fact",
+			world:      afterBindingWorld{effectiveScope: "openid profile"},
+			wantAnswer: afterBindingIssue,
 			wantReads:  []afterBindingFact{scope},
 		},
 	}

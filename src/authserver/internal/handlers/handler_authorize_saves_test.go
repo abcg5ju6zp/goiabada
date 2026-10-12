@@ -204,6 +204,7 @@ func TestHandleAuthorizeGet_EverySaveCarriesADeclaredState(t *testing.T) {
 			} else {
 				authorizeValidator.On("ValidateScopes", mock.Anything, "openid").Return(nil)
 				authorizeValidator.On("ValidatePrompt", tc.prompt).Return(tc.prompt, nil)
+				authorizeValidator.On("ValidateAuthorizationDetails", mock.Anything, mock.Anything).Return(nil, nil)
 			}
 
 			// Maybe, because which exits look the session up is not what this table is about: the

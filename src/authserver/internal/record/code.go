@@ -39,4 +39,10 @@ type Code struct {
 	// user's current value. Tagged dont-update so an ordinary full-row UpdateCode
 	// cannot regress it (#106).
 	AuthStateGeneration int64 `db:"auth_state_generation" fieldtag:"dont-update"`
+	// AuthorizationDetails is the immutable RFC 9396 snapshot the user approved at the
+	// consent screen, canonical JSON ("[]" for a scope-only code). It is written once at
+	// minting, re-validated at redemption and copied into the access token claim
+	// verbatim. Tagged dont-update so an ordinary UpdateCode cannot change the approved
+	// snapshot after minting.
+	AuthorizationDetails string `db:"authorization_details" fieldtag:"dont-update"`
 }

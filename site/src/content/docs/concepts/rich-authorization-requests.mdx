@@ -1,0 +1,69 @@
+---
+title: Rich authorization requests
+description: Ask for specific actions on specific resources with authorization_details (RFC 9396), and receive the approved set in the access token.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Rich authorization requests, defined in [RFC 9396](https://www.rfc-editor.org/rfc/rfc9396.html), let a client ask for fine-grained permissions instead of, or in addition to, scopes. A request carries an `authorization_details` JSON array; each item says what kind of detail it is, which resource it targets and which actions it asks for there.
+
+## The supported detail type
+
+The server implements one type, advertised in the [discovery document](/reference/endpoints/discovery-and-jwks/) as `authorization_details_types_supported`:
+
+```
+urn:goiabada:resource-permission
+```
+
+An item names a resource by its identifier and each action by a permission identifier on that resource, using the same identifiers the admin console shows for [resources and permissions](/concepts/resources-and-permissions/):
+
+```json
+[
+  {
+    "type": "urn:goiabada:resource-permission",
+    "resource": "invoicing",
+    "actions": ["invoice:read", "invoice:issue"]
+  }
+]
+```
+
+Canonical requests sort actions and items, use one item per resource, and stay within the request limits (at most 20 items, 50 actions each, 8 KiB total). The parameter is accepted on the authorization code flow only; an implicit response type refuses it.
+
+## What the server checks
+
+At [`/auth/authorize`](/reference/endpoints/authorize/), an item is rejected, each with its own error, when:
+
+- the JSON is malformed, not an array, empty, or exceeds a limit;
+- it uses an unknown `type`, omits `resource` or `actions`, or carries an unknown field;
+- the resource does not exist, or an action is not a permission declared on it;
+- the client is not licensed for the named permission (the client must hold it as a client permission).
+
+The authenticated user's own grants are checked once they sign in: the displayed set is narrowed to the permissions the user currently holds, directly or through a group.
+
+<Aside type="note">
+Rich authorization requests always show the consent screen, even when every scope is covered by a stored consent, because a stored scope consent cannot cover an item-level approval. `prompt=none` therefore answers `consent_required` when a request carries `authorization_details`.
+</Aside>
+
+## Consent and the code snapshot
+
+The consent page lists every retained item with its resource and actions, each with its own checkbox. The submission is re-filtered against the user's current permissions. The approved set is then written to the authorization code as an immutable, canonical JSON snapshot. No later request or browser parameter can change it; an item unticked is simply absent, and a page left on another ceremony cannot approve a different set.
+
+## The access token
+
+When the code is redeemed, and again on every refresh of a token descended from it, the server re-checks the snapshot against current data: the resource and permission must still exist, the client must still be licensed, and the user must still hold every action. If any of that no longer holds, the grant is refused with `invalid_grant`. Nothing is narrowed silently.
+
+A token for an approved grant carries the exact snapshot:
+
+```json
+{
+  "authorization_details": [
+    {
+      "type": "urn:goiabada:resource-permission",
+      "resource": "invoicing",
+      "actions": ["invoice:issue", "invoice:read"]
+    }
+  ]
+}
+```
+
+The resource server uses this claim alongside the audience: the resource identifier must match it, and the request is authorized only for the actions listed. A scope-only token omits the claim entirely.

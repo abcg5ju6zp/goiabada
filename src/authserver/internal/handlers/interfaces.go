@@ -8,6 +8,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/ceremony"
 	"github.com/leodip/goiabada/authserver/internal/issuance"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/richauth"
 	"github.com/leodip/goiabada/authserver/internal/usersession"
 	"github.com/leodip/goiabada/core/oauth"
 
@@ -78,6 +79,10 @@ type AuthorizeValidator interface {
 	ValidateRequest(input *protocolvalidation.ValidateRequestInput) error
 	ValidatePrompt(prompt string) (string, error)
 	ValidateUnsupportedRequestParameters(input *protocolvalidation.ValidateUnsupportedRequestParametersInput) error
+	// ValidateAuthorizationDetails parses the RFC 9396 authorization_details parameter and
+	// validates it against the registered detail types, existing resources/permissions and
+	// the client's license. It answers the canonical set, or nil for a scope-only request.
+	ValidateAuthorizationDetails(ctx context.Context, input *protocolvalidation.ValidateAuthorizationDetailsInput) ([]richauth.Detail, error)
 }
 
 // CodeIssuer issues an authorization code in a transaction of its own, which takes the session row
@@ -141,4 +146,8 @@ type CredentialFailureRecorder interface {
 
 type PermissionChecker interface {
 	FilterOutScopesWhereUserIsNotAuthorized(ctx context.Context, scope string, user *record.User) (string, error)
+	// FilterAuthorizationDetails narrows an RFC 9396 detail set to the actions the user
+	// currently holds, directly or through a group, the authorization_details twin of
+	// FilterOutScopesWhereUserIsNotAuthorized.
+	FilterAuthorizationDetails(ctx context.Context, details []richauth.Detail, user *record.User) ([]richauth.Detail, error)
 }

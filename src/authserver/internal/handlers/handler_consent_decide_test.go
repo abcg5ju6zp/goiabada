@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/leodip/goiabada/authserver/internal/richauth"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -61,6 +62,44 @@ func TestDecideConsentSubmission(t *testing.T) {
 			name:  "a selection holding every ticked scope is granted",
 			facts: consentSubmissionFacts{approved: true, ticked: []string{"openid", "profile"}, heldScope: held("openid profile")},
 			want:  consentSubmissionGranted,
+		},
+
+		// RFC 9396 authorization_details.
+		{
+			name: "a displayed but unticked detail is ticking nothing",
+			facts: consentSubmissionFacts{
+				approved: true, ticked: []string{"openid"}, displayedDetails: 1,
+				heldScope: held("openid"),
+			},
+			want: consentSubmissionNothingTicked,
+		},
+		{
+			name: "a ticked detail asks for the held selection alongside the scope",
+			facts: consentSubmissionFacts{
+				approved: true, ticked: []string{"openid"}, displayedDetails: 1,
+				tickedDetails: []richauth.Detail{{Resource: "billing", Actions: []string{"read"}}},
+			},
+			want:     consentSubmissionUndecided,
+			wantNeed: consentSubmissionFactHeldScope,
+		},
+		{
+			name: "a held scope with details the live filter emptied is nothing held",
+			facts: consentSubmissionFacts{
+				approved: true, ticked: []string{"openid"}, displayedDetails: 1,
+				tickedDetails: []richauth.Detail{{Resource: "billing", Actions: []string{"read"}}},
+				heldScope:     held("openid"), heldDetails: &[]richauth.Detail{},
+			},
+			want: consentSubmissionNothingHeld,
+		},
+		{
+			name: "a held scope and a held detail are granted",
+			facts: consentSubmissionFacts{
+				approved: true, ticked: []string{"openid"}, displayedDetails: 1,
+				tickedDetails: []richauth.Detail{{Resource: "billing", Actions: []string{"read"}}},
+				heldScope:     held("openid"),
+				heldDetails:   &[]richauth.Detail{{Resource: "billing", Actions: []string{"read"}}},
+			},
+			want: consentSubmissionGranted,
 		},
 	}
 
@@ -163,17 +202,43 @@ func TestTickedScopes(t *testing.T) {
 	}
 }
 
+// The detail checkboxes are positional against the ceremony's rendered list, and the
+// body can only tick what the screen showed: it never supplies a resource or action.
+func TestTickedDetails(t *testing.T) {
+	infos := []DetailInfo{
+		{Resource: "a-service", Actions: []string{"read"}, ActionsText: "read"},
+		{Resource: "b-service", Actions: []string{"admin", "write"}, ActionsText: "admin, write"},
+	}
+
+	t.Run("nothing ticked", func(t *testing.T) {
+		assert.Empty(t, tickedDetails(url.Values{}, infos))
+	})
+	t.Run("positional ticks resolve against the ceremony list", func(t *testing.T) {
+		got := tickedDetails(url.Values{"authDetail1": {"on"}, "authDetail0": {"on"}}, infos)
+		assert.Equal(t, []richauth.Detail{
+			{Type: richauth.ResourcePermissionDetailsType, Resource: "a-service", Actions: []string{"read"}},
+			{Type: richauth.ResourcePermissionDetailsType, Resource: "b-service", Actions: []string{"admin", "write"}},
+		}, got)
+	})
+	t.Run("a query-string tick is ignored, like scopes", func(t *testing.T) {
+		// Body-only: action? no, r.PostForm is supplied by the caller; here we just
+		// assert a key past the list ticks nothing.
+		assert.Empty(t, tickedDetails(url.Values{"authDetail2": {"on"}}, infos))
+	})
+}
+
 // When GET /auth/consent renders the screen rather than going on to issuance.
 func TestConsentScreenOwed(t *testing.T) {
 	consented := []ScopeInfo{{Scope: "openid", AlreadyConsented: true}, {Scope: "profile", AlreadyConsented: true}}
 	partial := []ScopeInfo{{Scope: "openid", AlreadyConsented: true}, {Scope: "profile", AlreadyConsented: false}}
 
 	testCases := []struct {
-		name          string
-		scopes        []ScopeInfo
-		scope         string
-		promptConsent bool
-		want          bool
+		name             string
+		scopes           []ScopeInfo
+		scope            string
+		promptConsent    bool
+		detailsRequested bool
+		want             bool
 	}{
 		{name: "everything already consented goes on", scopes: consented, scope: "openid profile", want: false},
 		{name: "one scope not yet consented is shown", scopes: partial, scope: "openid profile", want: true},
@@ -185,11 +250,12 @@ func TestConsentScreenOwed(t *testing.T) {
 		},
 		{name: "prompt=consent forces the screen", scopes: consented, scope: "openid profile", promptConsent: true, want: true},
 		{name: "an empty scope list is fully consented", scopes: []ScopeInfo{}, scope: "", want: false},
+		{name: "authorization_details force the screen", scopes: consented, scope: "openid profile", detailsRequested: true, want: true},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, consentScreenOwed(tc.scopes, tc.scope, tc.promptConsent))
+			assert.Equal(t, tc.want, consentScreenOwed(tc.scopes, tc.scope, tc.promptConsent, tc.detailsRequested))
 		})
 	}
 }

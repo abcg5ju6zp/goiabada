@@ -21,6 +21,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/richauth"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/core/errs"
 	"github.com/leodip/goiabada/core/logging/logtest"
@@ -4743,6 +4744,11 @@ func TestNewCreateCodeInput_CopiesEveryFieldTheCodeIsWrittenFrom(t *testing.T) {
 		// Ceremony state issuance does not read, set so that copying it anywhere would show.
 		CeremonyId: "ceremony-id",
 		AuthState:  ceremony.AuthStateReadyToIssueCode,
+		ConsentedAuthorizationDetails: []richauth.Detail{{
+			Type:     richauth.ResourcePermissionDetailsType,
+			Resource: "backend-service",
+			Actions:  []string{"read"},
+		}},
 	}
 
 	got := newCreateCodeInput(authContext, "session-identifier")
@@ -4766,6 +4772,11 @@ func TestNewCreateCodeInput_CopiesEveryFieldTheCodeIsWrittenFrom(t *testing.T) {
 		AuthStateGeneration: 9,
 		SessionIdentifier:   "session-identifier",
 		OTPClaim:            otpcredential.OTPClaim{Claimed: true, Generation: &otpClaimGeneration},
+		AuthorizationDetails: []richauth.Detail{{
+			Type:     richauth.ResourcePermissionDetailsType,
+			Resource: "backend-service",
+			Actions:  []string{"read"},
+		}},
 	}, got)
 
 	// A field added to CreateCodeInput and not copied here is left zero, which the literal above

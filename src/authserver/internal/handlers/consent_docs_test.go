@@ -131,7 +131,7 @@ func consentScreenShown(t *testing.T, world consentWorld) bool {
 	for _, s := range strings.Split(scope, " ") {
 		scopes = append(scopes, ScopeInfo{Scope: s, AlreadyConsented: storedConsent != nil && storedConsent.HasScope(s)})
 	}
-	return consentScreenOwed(scopes, scope, world.promptConsent)
+	return consentScreenOwed(scopes, scope, world.promptConsent, false)
 }
 
 // consentScreens is consentScreenShown for every world.

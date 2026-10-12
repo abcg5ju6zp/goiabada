@@ -17,6 +17,7 @@ import (
 	"github.com/leodip/goiabada/authserver/internal/otpcredential"
 	"github.com/leodip/goiabada/authserver/internal/protocolvalidation"
 	"github.com/leodip/goiabada/authserver/internal/record"
+	"github.com/leodip/goiabada/authserver/internal/richauth"
 	"github.com/leodip/goiabada/authserver/internal/reqctx"
 	"github.com/leodip/goiabada/authserver/internal/tokenmetrics"
 	"github.com/leodip/goiabada/authserver/internal/urlmatch"
@@ -786,6 +787,11 @@ func newCreateCodeInput(authContext *ceremony.AuthContext, sessionIdentifier str
 		AuthStateGeneration: authContext.AuthStateGeneration,
 		SessionIdentifier:   sessionIdentifier,
 		OTPClaim:            otpClaimOf(authContext),
+		// The consent-approved snapshot, the only field the code carries: requests with
+		// details always passed the consent screen, which set this exact value, and a
+		// skipped consent or prompt=none path leaves it nil because such a request could
+		// not have carried details.
+		AuthorizationDetails: richauth.Clone(authContext.ConsentedAuthorizationDetails),
 	}
 }
 

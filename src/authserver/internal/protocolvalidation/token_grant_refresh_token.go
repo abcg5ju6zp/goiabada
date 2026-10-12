@@ -523,6 +523,17 @@ func (val *TokenValidator) validateRefreshTokenGrant(ctx context.Context, settin
 		}
 	}
 
+	// The RFC 9396 boundary, the same fail-closed re-validation the initial code exchange
+	// performs: a refresh token descended from a code with authorization_details must not
+	// outlive the resource, the action, the client's license or the user's grant behind it,
+	// and a refreshed access token carries the same snapshot. The code is the one the
+	// presented token was issued from; RefreshTokenLoadCode loaded it above.
+	// ROPC refresh tokens carry no code (code_id NULL), and RefreshTokenLoadCode
+	// leaves the value zero-valued; the recheck is a no-op on its "[]" snapshot.
+	if err := val.recheckAuthorizationDetails(ctx, client, &refreshToken.Code); err != nil {
+		return nil, err
+	}
+
 	return &RefreshTokenGrant{
 		Client:         client,
 		RefreshToken:   refreshToken,
